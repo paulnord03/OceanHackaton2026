@@ -1,0 +1,1067 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>L'Aventure des Tortues de Méditerranée — Ocean Hackathon Toulon</title>
+    <meta
+      name="description"
+      content="Jeu scientifique sur les tortues marines de Méditerranée. Ocean Hackathon Toulon × Association Émergence."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+         PALETTE — Double thème (Mâle froid / Femelle chaud)
+         ============================================================ */
+      :root {
+        --white: #ffffff;
+        --night: #0a3c59;
+        --ink: #0a3c59;
+        --ink-soft: rgba(10, 60, 89, 0.65);
+        --ink-faint: rgba(10, 60, 89, 0.4);
+        --tint: #e0f4f7;
+        --radius: 24px;
+        --radius-sm: 16px;
+        --radius-xs: 12px;
+        --font-display: "Fredoka", "Montserrat", system-ui, sans-serif;
+        --font-body: "Montserrat", system-ui, sans-serif;
+
+        /* Thème Mâle (froid) — par défaut */
+        --ocean-deep: #0a3c59;
+        --ocean-mid: #125a82;
+        --ocean-surface: #0d4a6b;
+        --accent: #2ec4b6;
+        --accent-dark: #25a99c;
+        --accent-light: #5fe0d2;
+        --accent-soft: #a8f0e8;
+        --accent-violet: #4a5a8a;
+        --cta: #ff9f1c;
+        --cta-dark: #e8881a;
+        --cta-light: #ffb85c;
+        --shadow-theme: 0 12px 40px -8px rgba(10, 60, 89, 0.3);
+        --shadow-lg: 0 24px 60px -12px rgba(10, 60, 89, 0.4);
+        --shadow-glow: 0 0 40px rgba(46, 196, 182, 0.5);
+        --shadow-cta: 0 0 30px rgba(255, 159, 28, 0.5);
+        --badge-bg: rgba(46, 196, 182, 0.12);
+        --badge-text: #25a99c;
+        --card-border: rgba(46, 196, 182, 0.25);
+        --bg-surface: linear-gradient(180deg, #0d4a6b 0%, #0a3c59 45%, #072c42 100%);
+      }
+      [data-theme="female"] {
+        --ocean-deep: #b84a18;
+        --ocean-mid: #d96a20;
+        --ocean-surface: #c85518;
+        --accent: #ff9f1c;
+        --accent-dark: #e8881a;
+        --accent-light: #ffb85c;
+        --accent-soft: #ffe19c;
+        --accent-violet: #d4593a;
+        --cta: #2ec4b6;
+        --cta-dark: #25a99c;
+        --cta-light: #5fe0d2;
+        --shadow-theme: 0 12px 40px -8px rgba(184, 74, 24, 0.35);
+        --shadow-lg: 0 24px 60px -12px rgba(184, 74, 24, 0.4);
+        --shadow-glow: 0 0 40px rgba(255, 159, 28, 0.5);
+        --shadow-cta: 0 0 30px rgba(46, 196, 182, 0.5);
+        --badge-bg: rgba(255, 159, 28, 0.14);
+        --badge-text: #b84a18;
+        --card-border: rgba(255, 159, 28, 0.3);
+        --bg-surface: linear-gradient(180deg, #d96a20 0%, #b84a18 45%, #8a3812 100%);
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+      body {
+        font-family: var(--font-body); color: var(--ink);
+        min-height: 100vh; background: var(--ocean-deep);
+        overflow-x: hidden; transition: background 0.6s ease;
+      }
+
+      /* ============================================================
+         FOND OCÉAN ANIMÉ
+         ============================================================ */
+      .ocean-bg {
+        position: fixed; inset: 0; z-index: 0; overflow: hidden;
+        background: var(--bg-surface); transition: background 0.6s ease;
+      }
+      .caustics {
+        position: absolute; inset: 0;
+        background-image:
+          radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--accent-light) 18%, transparent) 0%, transparent 35%),
+          radial-gradient(circle at 70% 60%, color-mix(in srgb, var(--accent-soft) 14%, transparent) 0%, transparent 40%),
+          radial-gradient(circle at 50% 80%, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 45%);
+        background-size: 200% 200%; animation: causticDrift 16s ease-in-out infinite;
+      }
+      @keyframes causticDrift { 0%,100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
+      .blob {
+        position: absolute; border-radius: 50%; filter: blur(70px);
+        opacity: 0.35; animation: blobDrift 14s ease-in-out infinite;
+      }
+      .blob-1 { left: -10%; top: 0; width: 50vw; height: 50vh; background: color-mix(in srgb, var(--accent) 20%, transparent); }
+      .blob-2 { right: -10%; top: 30%; width: 45vw; height: 45vh; background: color-mix(in srgb, var(--accent-light) 15%, transparent); animation-delay: 3s; }
+      .blob-3 { left: 25%; bottom: 0; width: 40vw; height: 40vh; background: color-mix(in srgb, var(--cta) 8%, transparent); animation-delay: 5s; }
+      @keyframes blobDrift { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-20px) scale(1.1); } }
+      .ripple {
+        position: absolute; border: 2px solid color-mix(in srgb, var(--accent-light) 25%, transparent);
+        border-radius: 50%; animation: rippleExpand 5s ease-out infinite;
+      }
+      .ripple-1 { left: 12%; top: 14%; width: 90px; height: 90px; }
+      .ripple-2 { right: 18%; top: 22%; width: 120px; height: 120px; animation-delay: 1.5s; }
+      .ripple-3 { left: 45%; top: 8%; width: 70px; height: 70px; animation-delay: 2.8s; }
+      @keyframes rippleExpand { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(2.4); opacity: 0; } }
+      .bubbles { position: absolute; inset: 0; }
+      .bubble {
+        position: absolute; bottom: -30px; border-radius: 50%;
+        background: color-mix(in srgb, var(--accent-soft) 25%, transparent);
+        border: 1px solid color-mix(in srgb, var(--accent-light) 40%, transparent);
+        animation: bubbleRise linear infinite;
+      }
+      @keyframes bubbleRise { 0% { transform: translateY(0) scale(1); opacity: 0.5; } 100% { transform: translateY(-110vh) scale(0.3); opacity: 0; } }
+      .sun-rays {
+        position: absolute; top: -10%; left: 50%; transform: translateX(-50%);
+        width: 120vw; height: 45vh; opacity: 0.15;
+        background: conic-gradient(from 90deg at 50% 0%, transparent 0deg, color-mix(in srgb, var(--accent-soft) 40%, transparent) 12deg, transparent 24deg, color-mix(in srgb, var(--accent-soft) 30%, transparent) 40deg, transparent 56deg, color-mix(in srgb, var(--accent-soft) 40%, transparent) 72deg, transparent 88deg);
+        filter: blur(40px);
+      }
+
+      /* ============================================================
+         LAYOUT
+         ============================================================ */
+      .app { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+      .app-header { padding: 16px 16px 0; }
+      .app-header__inner {
+        max-width: 1080px; margin: 0 auto;
+        display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; }
+      .brand__logo { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; background: rgba(255,255,255,0.1); backdrop-filter: blur(8px); font-size: 22px; }
+      .brand__title { font-family: var(--font-display); font-weight: 700; font-size: 17px; color: var(--white); text-shadow: 0 2px 12px rgba(0,0,0,0.3); line-height: 1.1; }
+      .brand__sub { font-size: 11px; font-weight: 600; color: var(--accent-soft); }
+
+      .emergence-badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 6px 14px; border-radius: 999px;
+        background: rgba(255,255,255,0.08); backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.15);
+        font-size: 11px; font-weight: 700; color: var(--white); letter-spacing: 0.03em;
+      }
+      .emergence-badge__logo { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #2ec4b6; color: #2ec4b6; font-size: 11px; }
+
+      .icon-btn {
+        display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px;
+        background: rgba(255,255,255,0.1); backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.12); color: var(--white);
+        cursor: pointer; transition: all 0.3s ease; border: none;
+      }
+      .icon-btn:hover { background: rgba(255,255,255,0.2); }
+      .icon-btn:hover svg { transform: rotate(60deg); }
+      .icon-btn svg { width: 20px; height: 20px; transition: transform 0.3s ease; }
+
+      .stepper { display: flex; align-items: center; gap: 4px; }
+      .stepper__item { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; transition: all 0.3s ease; }
+      .stepper__item--active { background: var(--accent); color: var(--white); box-shadow: var(--shadow-glow); }
+      .stepper__item--done { background: rgba(255,255,255,0.15); color: var(--accent-soft); }
+      .stepper__item--todo { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.4); }
+      .stepper__dot { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 10px; }
+      .stepper__item--active .stepper__dot { background: var(--white); color: var(--accent-dark); }
+      .stepper__item--done .stepper__dot { background: var(--accent); color: var(--white); }
+      .stepper__item--todo .stepper__dot { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); }
+      .stepper__sep { color: rgba(255,255,255,0.25); font-size: 12px; }
+
+      .app-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+      .stage { width: 100%; max-width: 880px; }
+
+      /* ============================================================
+         CARTES
+         ============================================================ */
+      .card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 28px 24px; transition: box-shadow 0.6s ease; }
+      @media (min-width: 640px) { .card { padding: 40px 36px; } }
+      .card--center { text-align: center; }
+
+      .kicker {
+        display: inline-flex; align-items: center; gap: 8px;
+        font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+        color: var(--accent-dark); background: var(--badge-bg);
+        padding: 6px 12px; border-radius: 999px; margin-bottom: 12px; transition: all 0.4s ease;
+      }
+      .kicker::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+      .card__title { font-family: var(--font-display); font-weight: 700; font-size: 24px; color: var(--night); line-height: 1.2; margin-bottom: 8px; }
+      @media (min-width: 640px) { .card__title { font-size: 30px; } }
+      .card__subtitle { font-size: 14px; font-weight: 500; color: var(--ink-soft); margin-bottom: 24px; line-height: 1.55; }
+
+      /* ============================================================
+         PANNEAUX / TRANSITIONS
+         ============================================================ */
+      .panel { display: none; }
+      .panel--active { display: block; animation: slideInRight 0.5s ease-out both; }
+      .panel--leaving { display: block; animation: slideOutLeft 0.3s ease-in both; }
+      @keyframes slideInRight { 0% { opacity: 0; transform: translateX(30px); } 100% { opacity: 1; transform: translateX(0); } }
+      @keyframes slideOutLeft { 0% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(-30px); } }
+      @keyframes fadeIn { 0% { opacity: 0; transform: translateY(14px); } 100% { opacity: 1; transform: translateY(0); } }
+      @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+      @keyframes swimGentle { 0%,100% { transform: translate(-50%,-50%) rotate(-3deg); } 50% { transform: translate(-50%,-58%) rotate(3deg); } }
+      @keyframes pulseCoral { 0%,100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--cta) 50%, transparent); } 50% { transform: scale(1.03); box-shadow: 0 0 0 14px color-mix(in srgb, var(--cta) 0%, transparent); } }
+      @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+      @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 currentColor; } 100% { box-shadow: 0 0 0 10px transparent; } }
+
+      /* ============================================================
+         ÉCRAN 1 — HÉRO
+         ============================================================ */
+      .hero { position: relative; min-height: 78vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; }
+      .hero__badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 999px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); font-size: 12px; font-weight: 700; color: var(--accent-soft); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 24px; animation: fadeIn 0.6s ease-out both; }
+      .hero__title { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 5.5vw, 48px); color: var(--white); text-shadow: 0 4px 30px rgba(0,0,0,0.4); line-height: 1.05; margin-bottom: 12px; max-width: 820px; animation: fadeIn 0.8s ease-out 0.2s both; }
+      .hero__sub { font-size: clamp(13px, 2.3vw, 16px); font-weight: 500; color: rgba(255,255,255,0.8); max-width: 600px; margin-bottom: 28px; line-height: 1.55; animation: fadeIn 0.8s ease-out 0.4s both; }
+      .hero__turtle { animation: float 4s ease-in-out infinite, fadeIn 1s ease-out 0.3s both; margin-bottom: 24px; }
+
+      .scene-visual { position: relative; width: 100%; max-width: 520px; margin: 0 auto 16px; aspect-ratio: 16 / 9; border-radius: var(--radius-sm); overflow: hidden; border: 2px solid var(--tint); box-shadow: var(--shadow-theme); transition: box-shadow 0.6s ease; }
+      .scene-visual svg { width: 100%; height: 100%; display: block; }
+      .scene__caption { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 18px; }
+
+      /* ============================================================
+         BOUTONS
+         ============================================================ */
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; border-radius: var(--radius-sm); padding: 14px 26px; font-family: var(--font-display); font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.22s ease; text-decoration: none; }
+      .btn:disabled { cursor: not-allowed; opacity: 0.4; }
+      .btn--cta { background: var(--cta); color: var(--white); box-shadow: var(--shadow-cta); }
+      .btn--cta:hover:not(:disabled) { background: var(--cta-dark); transform: scale(1.03); }
+      .btn--cta:active:not(:disabled) { transform: scale(0.97); }
+      .btn--cta--pulse { animation: pulseCoral 2.2s ease-in-out infinite; }
+      .btn--ghost { background: transparent; color: var(--ink-soft); padding: 14px 16px; }
+      .btn--ghost:hover { background: var(--tint); color: var(--night); }
+      .btn--lg { padding: 18px 36px; font-size: 18px; border-radius: 20px; }
+      .btn--block { width: 100%; }
+      .btn .arrow { transition: transform 0.2s ease; }
+      .btn:hover:not(:disabled) .arrow { transform: translateX(4px); }
+      .actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; }
+
+      /* ============================================================
+         CHAMPS
+         ============================================================ */
+      .field { margin-bottom: 20px; }
+      .field__label { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--night); margin-bottom: 8px; }
+      .field__input { width: 100%; border: 2px solid var(--tint); background: rgba(224,244,247,0.4); border-radius: var(--radius-sm); padding: 14px 18px; font-family: var(--font-body); font-size: 17px; font-weight: 600; color: var(--night); outline: none; transition: all 0.2s ease; }
+      .field__input::placeholder { color: var(--ink-faint); font-weight: 500; }
+      .field__input:focus { border-color: var(--accent); background: var(--white); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent); }
+      .field__hint { font-size: 12px; font-weight: 600; color: var(--ink-faint); margin-top: 6px; padding: 0 8px; display: flex; justify-content: space-between; }
+      .field__valid { font-size: 11px; font-weight: 800; color: var(--accent-dark); opacity: 0; transition: opacity 0.2s; }
+      .field__valid.is-visible { opacity: 1; }
+      .suggest-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+      .suggest-btn { padding: 6px 14px; border-radius: 999px; border: 2px solid var(--tint); background: rgba(224,244,247,0.3); font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; transition: all 0.2s; }
+      .suggest-btn:hover { border-color: var(--accent); color: var(--accent-dark); background: var(--badge-bg); }
+
+      /* ============================================================
+         SÉLECTION GENRE
+         ============================================================ */
+      .gender-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 500px; margin: 0 auto; }
+      .gender-card { position: relative; display: flex; align-items: center; gap: 14px; padding: 20px; border: 2px solid var(--tint); border-radius: var(--radius-sm); background: rgba(224,244,247,0.3); cursor: pointer; transition: all 0.25s ease; font-family: var(--font-body); text-align: left; border: none; }
+      .gender-card:hover { border-color: var(--accent-light); background: rgba(224,244,247,0.6); transform: translateY(-2px); }
+      .gender-card.is-selected { border-color: var(--accent); background: var(--accent); color: var(--white); box-shadow: var(--shadow-glow); transform: scale(1.02); }
+      .gender-card__icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; font-size: 26px; font-weight: 700; flex-shrink: 0; transition: all 0.25s; }
+      .gender-card[data-gender="male"] .gender-card__icon { background: rgba(10,60,89,0.12); color: #0a3c59; }
+      .gender-card[data-gender="female"] .gender-card__icon { background: rgba(255,159,28,0.15); color: #b84a18; }
+      .gender-card.is-selected .gender-card__icon { background: rgba(255,255,255,0.2); color: var(--white); }
+      .gender-card__label { font-family: var(--font-display); font-size: 18px; font-weight: 700; line-height: 1; }
+      .gender-card__sub { font-size: 11px; font-weight: 600; opacity: 0.7; margin-top: 4px; }
+      .gender-card__check { position: absolute; top: -8px; right: -8px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--white); color: var(--accent-dark); font-size: 14px; font-weight: 900; box-shadow: 0 2px 8px rgba(0,0,0,0.2); opacity: 0; transform: scale(0); transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+      .gender-card.is-selected .gender-card__check { opacity: 1; transform: scale(1); }
+
+      /* ============================================================
+         PRÉVISUALISATION TORTUE
+         ============================================================ */
+      .preview { display: flex; flex-direction: column; align-items: center; }
+      .preview__frame { position: relative; width: 200px; height: 200px; border-radius: 50%; overflow: hidden; background: linear-gradient(180deg, var(--accent-soft) 0%, var(--tint) 50%, color-mix(in srgb, var(--accent-light) 60%, transparent) 100%); border: 4px solid var(--white); box-shadow: var(--shadow-theme); animation: float 4s ease-in-out infinite; transition: all 0.6s ease; }
+      .preview__svg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: swimGentle 5s ease-in-out infinite; }
+      .preview__badge { margin-top: 14px; max-width: 260px; padding: 8px 14px; border-radius: 14px; background: var(--ocean-deep); color: var(--white); font-size: 11px; font-weight: 700; text-align: center; line-height: 1.3; transition: background 0.6s ease; }
+
+      /* ============================================================
+         BANDEAU SCIENCE
+         ============================================================ */
+      .science-band { margin-top: 18px; padding: 16px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 8%, var(--white)); border-left: 4px solid var(--accent); display: flex; gap: 14px; align-items: flex-start; text-align: left; transition: all 0.4s ease; }
+      .science-band__icon { flex-shrink: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: var(--white); font-size: 20px; }
+      .science-band__text { font-size: 13px; font-weight: 600; color: var(--night); line-height: 1.5; }
+      .science-band__text strong { color: var(--accent-dark); font-weight: 800; }
+
+      /* ============================================================
+         CARTE MÉDITERRANÉE
+         ============================================================ */
+      .map-wrapper { display: grid; gap: 16px; }
+      @media (min-width: 768px) { .map-wrapper { grid-template-columns: 210px 1fr; } }
+
+      .map-filters { display: flex; flex-direction: column; gap: 8px; }
+      .filter-btn { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radius-xs); border: 2px solid var(--tint); background: var(--white); cursor: pointer; transition: all 0.22s ease; font-family: var(--font-body); font-size: 12px; font-weight: 700; color: var(--ink-soft); text-align: left; width: 100%; }
+      .filter-btn:hover { border-color: var(--accent-light); }
+      .filter-btn.is-active { border-color: var(--accent); background: var(--badge-bg); color: var(--accent-dark); }
+      .filter-btn__dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+      .filter-btn__count { margin-left: auto; font-size: 10px; font-weight: 800; color: var(--ink-faint); background: var(--tint); padding: 2px 8px; border-radius: 999px; }
+
+      .map-container { position: relative; width: 100%; aspect-ratio: 16 / 11; border-radius: var(--radius-sm); overflow: hidden; border: 2px solid var(--tint); box-shadow: var(--shadow-theme); background: linear-gradient(160deg, #a8d8e8 0%, #7ec8d8 40%, #5ab0c8 100%); transition: box-shadow 0.6s ease; }
+      .map-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+      .map-pin { position: absolute; transform: translate(-50%, -100%); cursor: pointer; z-index: 3; transition: all 0.2s ease; }
+      .map-pin:hover { transform: translate(-50%, -115%) scale(1.2); z-index: 10; }
+      .map-pin__dot { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--white); box-shadow: 0 2px 8px rgba(0,0,0,0.3); animation: pinPulse 2.5s ease-in-out infinite; }
+      .map-pin--nesting .map-pin__dot { background: #ff9f1c; }
+      .map-pin--nesting-cool .map-pin__dot { background: #2ec4b6; }
+      .map-pin--feeding .map-pin__dot { background: #2ec4b6; }
+      .map-pin--observation .map-pin__dot { background: #4a8ac4; }
+      .map-pin--danger .map-pin__dot { background: #e74c3c; }
+      .map-pin--toulon .map-pin__dot { background: #9b59b6; width: 20px; height: 20px; }
+      @keyframes pinPulse { 0%,100% { box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 0 0 currentColor; } 50% { box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 0 6px transparent; } }
+      .map-pin__label { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 6px 12px; border-radius: 10px; background: var(--white); color: var(--night); font-size: 10px; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; pointer-events: none; transition: opacity 0.2s; max-width: 220px; }
+      .map-pin:hover .map-pin__label { opacity: 1; }
+      .map-pin--selected .map-pin__dot { width: 22px; height: 22px; border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent), 0 2px 12px rgba(0,0,0,0.3); animation: none; }
+      .map-pin--selected::after { content: "✓"; position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--white); font-size: 10px; font-weight: 900; display: grid; place-items: center; animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+      .map-legend { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; font-size: 11px; font-weight: 700; color: var(--ink-soft); }
+      .map-legend__item { display: flex; align-items: center; gap: 5px; }
+      .map-legend__dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--white); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+      /* Fiche info marker */
+      .marker-info { margin-top: 16px; border: 2px solid var(--card-border); border-radius: var(--radius-sm); background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 6%, transparent) 0%, rgba(224,244,247,0.5) 100%); padding: 18px; display: none; animation: fadeIn 0.4s ease-out both; transition: all 0.4s ease; }
+      .marker-info.is-visible { display: block; }
+      .marker-info__head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+      .marker-info__dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--white); box-shadow: 0 1px 4px rgba(0,0,0,0.15); flex-shrink: 0; }
+      .marker-info__title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--night); }
+      .marker-info__coords { font-size: 11px; font-weight: 600; color: var(--ink-faint); font-variant-numeric: tabular-nums; margin-bottom: 10px; }
+      .marker-info__desc { font-size: 13px; font-weight: 500; color: rgba(10,60,89,0.8); line-height: 1.55; margin-bottom: 12px; }
+      .marker-info__stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+      .stat-pill { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--white); color: var(--night); }
+      .stat-pill strong { color: var(--accent-dark); font-weight: 800; }
+      .stat-pill--temp { background: var(--white); }
+      .stat-pill--temp.hot { border: 2px solid #ff9f1c; }
+      .stat-pill--temp.hot strong { color: #e8881a; }
+      .stat-pill--temp.cool { border: 2px solid #2ec4b6; }
+      .stat-pill--temp.cool strong { color: #25a99c; }
+      .marker-info__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+      .marker-info__tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: var(--badge-bg); font-size: 10px; font-weight: 700; color: var(--accent-dark); }
+      .marker-info__tag--hot { background: rgba(255,159,28,0.14); color: #e8881a; }
+      .marker-info__tag--cool { background: rgba(46,196,182,0.14); color: #25a99c; }
+      .marker-info__tag--danger { background: rgba(231,76,60,0.12); color: #c0392b; }
+      .marker-info__select-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: var(--radius-sm); border: none; background: var(--cta); color: var(--white); font-family: var(--font-display); font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; }
+      .marker-info__select-btn:hover:not(:disabled) { background: var(--cta-dark); transform: scale(1.03); }
+      .marker-info__select-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .marker-info__select-btn.is-selected { background: var(--accent); }
+
+      /* ============================================================
+         RÉCAPITULATIF (Étape 4)
+         ============================================================ */
+      .recap-grid { display: grid; gap: 14px; max-width: 540px; margin: 0 auto 24px; }
+      .recap-row { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--radius-sm); background: var(--tint); transition: background 0.6s ease; }
+      .recap-row__icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--white); font-size: 22px; flex-shrink: 0; box-shadow: var(--shadow-theme); }
+      .recap-row__label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); }
+      .recap-row__value { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--night); }
+      .recap-row__temp { font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 999px; margin-top: 4px; display: inline-block; }
+      .recap-row__temp--hot { background: rgba(255,159,28,0.15); color: #e8881a; }
+      .recap-row__temp--cool { background: rgba(46,196,182,0.15); color: #25a99c; }
+      .recap-preview { display: flex; justify-content: center; margin-bottom: 24px; }
+
+      /* ============================================================
+         MODALE
+         ============================================================ */
+      .modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(10,60,89,0.6); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; padding: 20px; }
+      .modal-overlay.is-open { display: flex; animation: fadeIn 0.3s ease-out; }
+      .modal { background: var(--white); border-radius: var(--radius); max-width: 480px; width: 100%; box-shadow: var(--shadow-lg); padding: 28px; position: relative; animation: popIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both; }
+      .modal__close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--tint); color: var(--ink-soft); cursor: pointer; font-size: 18px; font-weight: 700; transition: all 0.2s; }
+      .modal__close:hover { background: var(--accent); color: var(--white); }
+      .modal__icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: var(--badge-bg); color: var(--accent-dark); font-size: 24px; margin-bottom: 14px; }
+      .modal__title { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--night); margin-bottom: 10px; }
+      .modal__body { font-size: 14px; font-weight: 500; color: var(--ink-soft); line-height: 1.6; }
+      .modal__body p { margin-bottom: 10px; }
+      .modal__body strong { color: var(--accent-dark); font-weight: 800; }
+      .modal__source { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--tint); font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+
+      .app-footer { padding: 12px 16px 20px; text-align: center; }
+      .app-footer p { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.4); }
+
+      /* ============================================================
+         RESPONSIVE
+         ============================================================ */
+      @media (max-width: 640px) {
+        .stepper { display: none; }
+        .actions { flex-direction: column-reverse; gap: 10px; }
+        .actions .btn { width: 100%; }
+        .map-wrapper { grid-template-columns: 1fr; }
+        .map-filters { flex-direction: row; overflow-x: auto; padding-bottom: 6px; }
+        .filter-btn { white-space: nowrap; min-width: 170px; }
+        .gender-grid { gap: 10px; }
+        .gender-card { padding: 14px; }
+      }
+      @media (min-width: 641px) {
+        .custom-grid { display: grid; grid-template-columns: 1fr 220px; gap: 28px; align-items: start; }
+      }
+    </style>
+    <meta property="og:image" content="https://bolt.new/static/og_default.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
+</head>
+  <body>
+    <!-- ============ FOND OCÉAN ============ -->
+    <div class="ocean-bg" aria-hidden="true">
+      <div class="sun-rays"></div>
+      <div class="caustics"></div>
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+      <div class="ripple ripple-1"></div>
+      <div class="ripple ripple-2"></div>
+      <div class="ripple ripple-3"></div>
+      <div class="bubbles" id="bubbles"></div>
+    </div>
+
+    <div class="app">
+      <!-- ============ EN-TÊTE ============ -->
+      <header class="app-header">
+        <div class="app-header__inner">
+          <div class="brand">
+            <span class="brand__logo">🐢</span>
+            <div>
+              <div class="brand__title">L'Aventure des Tortues</div>
+              <div class="brand__sub">Ocean Hackathon Toulon</div>
+            </div>
+          </div>
+          <nav class="stepper" id="stepper" aria-label="Progression">
+            <div class="stepper__item stepper__item--active" data-step="0"><span class="stepper__dot">1</span><span>Accueil</span></div>
+            <span class="stepper__sep">›</span>
+            <div class="stepper__item stepper__item--todo" data-step="1"><span class="stepper__dot">2</span><span>Tortue</span></div>
+            <span class="stepper__sep">›</span>
+            <div class="stepper__item stepper__item--todo" data-step="2"><span class="stepper__dot">3</span><span>Carte</span></div>
+            <span class="stepper__sep">›</span>
+            <div class="stepper__item stepper__item--todo" data-step="3"><span class="stepper__dot">4</span><span>Lancement</span></div>
+          </nav>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="emergence-badge"><span class="emergence-badge__logo">🐢</span>ÉMERGENCE</span>
+            <button class="icon-btn" id="btn-settings" title="Paramètres" aria-label="Paramètres">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- ============ CONTENU ============ -->
+      <main class="app-main">
+        <div class="stage" id="stage">
+
+          <!-- ====== ÉTAPE 1 — ACCUEIL & CONTEXTE TOULON ====== -->
+          <section class="panel panel--active" id="screen-story" data-step="0">
+            <div class="hero">
+              <span class="hero__badge">Ocean Hackathon Toulon × Association Émergence</span>
+              <div class="hero__turtle" id="hero-turtle"></div>
+              <h1 class="hero__title">L'Aventure des Tortues de Méditerranée</h1>
+              <p class="hero__sub">
+                Le climat change et les températures de surface augmentent. En Méditerranée, notamment sur le littoral du Var et autour de Toulon, de nouvelles pontes exceptionnelles sont observées. Explore l'impact de la température du sable sur le sexe et la survie des tortues marines.
+              </p>
+
+              <div class="scene-visual" style="max-width:500px;">
+                <svg viewBox="0 0 500 280">
+                  <defs><linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f4e4c8"/><stop offset="100%" stop-color="#e8d0a8"/></linearGradient></defs>
+                  <rect width="500" height="180" fill="url(#skyG)"/>
+                  <rect y="180" width="500" height="100" fill="#7ec8d8"/>
+                  <path d="M0,180 Q250,165 500,180 L500,190 L0,190 Z" fill="#c8b898"/>
+                  <circle cx="400" cy="55" r="30" fill="#fff8e0" opacity="0.85"/>
+                  <rect x="135" y="125" width="100" height="34" rx="4" fill="#ff9f1c" opacity="0.85"/>
+                  <text x="185" y="147" text-anchor="middle" fill="#fff" font-family="Fredoka" font-size="11" font-weight="700">NID BALISÉ</text>
+                  <g><circle cx="110" cy="165" r="9" fill="#2ec4b6"/><rect x="105" y="148" width="10" height="18" fill="#2ec4b6"/></g>
+                  <g><circle cx="210" cy="165" r="9" fill="#2ec4b6"/><rect x="205" y="148" width="10" height="18" fill="#2ec4b6"/></g>
+                  <g><circle cx="285" cy="165" r="9" fill="#2ec4b6"/><rect x="280" y="148" width="10" height="18" fill="#2ec4b6"/></g>
+                  <g><circle cx="360" cy="165" r="9" fill="#2ec4b6"/><rect x="355" y="148" width="10" height="18" fill="#2ec4b6"/></g>
+                  <text x="55" y="45" fill="#0a3c59" font-family="Fredoka" font-size="12" font-weight="600">👮 Police Municipale</text>
+                  <text x="310" y="45" fill="#2ec4b6" font-family="Fredoka" font-size="12" font-weight="600">💚 Bénévoles Émergence</text>
+                  <text x="250" y="235" text-anchor="middle" fill="#fff" font-family="Fredoka" font-size="14" font-weight="600">🌊 Littoral du Var — Toulon</text>
+                </svg>
+              </div>
+              <p class="scene__caption">Balisage de protection d'un nid par la Police Municipale et l'Association Émergence (t-shirt vert)</p>
+
+              <div class="science-band" style="max-width:580px;text-align:left;">
+                <div class="science-band__icon">🌡️</div>
+                <div class="science-band__text">
+                  <strong>Le savais-tu ?</strong> La température du sable détermine le sexe des tortues (TSD). Au-dessus de <strong>29.5°C</strong>, naissent des <strong>femelles</strong> ; en dessous de <strong>28.5°C</strong>, des <strong>mâles</strong>. La hausse des températures crée une <strong>pénurie critique de mâles</strong> en Méditerranée.
+                </div>
+              </div>
+
+              <div class="actions" style="justify-content:center;margin-top:24px;">
+                <button class="btn btn--cta btn--lg btn--cta--pulse" id="btn-step1-next">Commencer l'Aventure <span class="arrow">→</span></button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====== ÉTAPE 2 — PERSONNALISATION ====== -->
+          <section class="panel" id="screen-customize" data-step="1" hidden>
+            <div class="card">
+              <span class="kicker">Création du personnage</span>
+              <h2 class="card__title">Personnalise ta tortue marine 🐢</h2>
+              <p class="card__subtitle">Donne un prénom à ton individu et choisis son sexe. Le thème visuel du jeu s'adaptera automatiquement.</p>
+              <div class="custom-grid">
+                <div>
+                  <div class="field">
+                    <label class="field__label" for="turtle-name">✎ Donne un prénom à ta tortue</label>
+                    <input type="text" id="turtle-name" class="field__input" placeholder="Ex: Caretta, Lucky, Hope, CC39..." maxlength="24" autocomplete="off" spellcheck="false" />
+                    <div class="field__hint">
+                      <span id="name-count">0/24 caractères</span>
+                      <span class="field__valid" id="name-valid">✓ Prénom valide</span>
+                    </div>
+                  </div>
+                  <div class="suggest-row">
+                    <button class="suggest-btn" data-suggest="Caretta">Caretta</button>
+                    <button class="suggest-btn" data-suggest="Lucky">Lucky</button>
+                    <button class="suggest-btn" data-suggest="Hope">Hope</button>
+                    <button class="suggest-btn" data-suggest="CC39">CC39</button>
+                    <button class="suggest-btn" data-suggest="Calypso">Calypso</button>
+                  </div>
+                  <div class="field" style="margin-bottom:0;">
+                    <label class="field__label">⚥ Sélectionne le sexe</label>
+                    <div class="gender-grid">
+                      <button type="button" class="gender-card" data-gender="male" aria-pressed="false">
+                        <span class="gender-card__icon">♂</span>
+                        <div><div class="gender-card__label">Mâle</div><div class="gender-card__sub">Couleurs froides</div></div>
+                        <span class="gender-card__check">✓</span>
+                      </button>
+                      <button type="button" class="gender-card" data-gender="female" aria-pressed="false">
+                        <span class="gender-card__icon">♀</span>
+                        <div><div class="gender-card__label">Femelle</div><div class="gender-card__sub">Couleurs chaudes</div></div>
+                        <span class="gender-card__check">✓</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="preview">
+                  <div class="preview__frame"><div class="preview__svg" id="preview-turtle"></div></div>
+                  <div class="preview__badge" id="preview-badge">En attente de personnalisation...</div>
+                </div>
+              </div>
+              <div class="actions">
+                <button class="btn btn--ghost" data-goto="0">← Retour</button>
+                <button class="btn btn--cta" id="btn-step2-next" disabled>Explorer la Carte de Méditerranée <span class="arrow">→</span></button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====== ÉTAPE 3 — CARTE DE MÉDITERRANÉE ====== -->
+          <section class="panel" id="screen-map" data-step="2" hidden>
+            <div class="card">
+              <span class="kicker">Choix du lieu de naissance</span>
+              <h2 class="card__title">Carte de Méditerranée 🗺️</h2>
+              <p class="card__subtitle">Clique sur un marqueur pour voir sa fiche. Sélectionne un site de ponte (orange/turquoise) comme lieu de départ. Filtre les calques pour explorer chaque type de zone.</p>
+
+              <div class="map-legend">
+                <div class="map-legend__item"><span class="map-legend__dot" style="background:#ff9f1c;"></span>Ponte (sable chaud ♀)</div>
+                <div class="map-legend__item"><span class="map-legend__dot" style="background:#2ec4b6;"></span>Ponte (sable frais ♂)</div>
+                <div class="map-legend__item"><span class="map-legend__dot" style="background:#9b59b6;"></span>Toulon / Var</div>
+                <div class="map-legend__item"><span class="map-legend__dot" style="background:#4a8ac4;"></span>Observation</div>
+                <div class="map-legend__item"><span class="map-legend__dot" style="background:#e74c3c;"></span>Danger</div>
+              </div>
+
+              <div class="map-wrapper">
+                <div class="map-filters" id="map-filters">
+                  <button class="filter-btn is-active" data-layer="all"><span class="filter-btn__dot" style="background:linear-gradient(135deg,#ff9f1c,#2ec4b6,#9b59b6,#4a8ac4,#e74c3c);"></span>Tous les calques<span class="filter-btn__count" id="count-all">0</span></button>
+                  <button class="filter-btn" data-layer="nesting"><span class="filter-btn__dot" style="background:#ff9f1c;"></span>Zones de ponte<span class="filter-btn__count" id="count-nesting">0</span></button>
+                  <button class="filter-btn" data-layer="feeding"><span class="filter-btn__dot" style="background:#2ec4b6;"></span>Nourrissage & méduses<span class="filter-btn__count" id="count-feeding">0</span></button>
+                  <button class="filter-btn" data-layer="observation"><span class="filter-btn__dot" style="background:#4a8ac4;"></span>Observation écoresponsable<span class="filter-btn__count" id="count-observation">0</span></button>
+                  <button class="filter-btn" data-layer="danger"><span class="filter-btn__dot" style="background:#e74c3c;"></span>Dangers humains<span class="filter-btn__count" id="count-danger">0</span></button>
+                </div>
+
+                <div class="map-container" id="map-container">
+                  <svg class="map-svg" viewBox="0 0 800 550" preserveAspectRatio="xMidYMid slice">
+                    <defs><linearGradient id="seaG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a8d8e8"/><stop offset="100%" stop-color="#5ab0c8"/></linearGradient></defs>
+                    <rect width="800" height="550" fill="url(#seaG)"/>
+                    <!-- Côtes françaises -->
+                    <path d="M 60 100 Q 100 80 140 90 L 180 70 Q 220 60 260 75 L 300 65 Q 340 55 380 70 L 430 60 Q 480 55 530 70 L 570 80 Q 600 75 620 100 L 600 140 Q 580 160 550 170 L 510 180 Q 470 190 430 180 L 390 190 Q 350 200 310 190 L 270 200 Q 230 210 190 200 L 150 180 Q 110 160 80 130 Z" fill="#e8d8b8" stroke="#c8b898" stroke-width="2"/>
+                    <!-- Côte espagnole -->
+                    <path d="M 80 360 Q 120 340 160 350 L 190 370 Q 210 390 200 420 L 170 440 Q 130 445 100 430 L 70 410 Q 60 380 80 360 Z" fill="#e8d8b8" stroke="#c8b898" stroke-width="2"/>
+                    <ellipse cx="160" cy="390" rx="32" ry="20" fill="#d8c8a8" stroke="#c8b898" stroke-width="1.5"/>
+                    <!-- Corse -->
+                    <path d="M 560 240 Q 590 230 620 245 L 640 270 Q 650 300 630 320 L 600 335 Q 570 340 555 325 L 545 300 Q 540 270 560 240 Z" fill="#e8d8b8" stroke="#c8b898" stroke-width="2"/>
+                    <!-- Italie/Sicile -->
+                    <path d="M 660 380 Q 700 370 740 385 L 760 410 Q 770 440 750 460 L 720 470 Q 690 475 670 465 L 650 445 Q 640 410 660 380 Z" fill="#e8d8b8" stroke="#c8b898" stroke-width="2"/>
+                    <!-- Zones de chaleur (sable chaud >29.5°C = femelles) -->
+                    <ellipse cx="350" cy="125" rx="50" ry="32" fill="rgba(255,159,28,0.18)"/>
+                    <ellipse cx="470" cy="120" rx="40" ry="26" fill="rgba(255,159,28,0.15)"/>
+                    <!-- Zones de sable frais (<28.5°C = mâles) -->
+                    <ellipse cx="200" cy="155" rx="45" ry="28" fill="rgba(46,196,182,0.15)"/>
+                    <ellipse cx="140" cy="400" rx="35" ry="22" fill="rgba(46,196,182,0.12)"/>
+                    <!-- Labels -->
+                    <text x="280" y="120" fill="#0a3c59" font-family="Montserrat" font-size="12" font-weight="700" opacity="0.35">FRANCE</text>
+                    <text x="135" y="395" fill="#0a3c59" font-family="Montserrat" font-size="10" font-weight="700" opacity="0.35">BALÉARES</text>
+                    <text x="575" y="285" fill="#0a3c59" font-family="Montserrat" font-size="10" font-weight="700" opacity="0.35">CORSE</text>
+                    <text x="690" y="420" fill="#0a3c59" font-family="Montserrat" font-size="9" font-weight="700" opacity="0.35">SICILE</text>
+                    <text x="350" y="500" fill="#0a3c59" font-family="Montserrat" font-size="10" font-weight="700" opacity="0.2">MER MÉDITERRANÉE</text>
+                    <!-- Indicateur Toulon focus -->
+                    <circle cx="340" cy="135" r="40" fill="none" stroke="#9b59b6" stroke-width="2" stroke-dasharray="6 4" opacity="0.5"/>
+                    <text x="340" y="100" text-anchor="middle" fill="#9b59b6" font-family="Fredoka" font-size="10" font-weight="700" opacity="0.6">TOULON / VAR</text>
+                  </svg>
+                  <div id="map-pins"></div>
+                </div>
+              </div>
+
+              <div class="marker-info" id="marker-info">
+                <div class="marker-info__head">
+                  <span class="marker-info__dot" id="mi-dot"></span>
+                  <div><div class="marker-info__title" id="mi-title"></div><div class="marker-info__coords" id="mi-coords"></div></div>
+                </div>
+                <p class="marker-info__desc" id="mi-desc"></p>
+                <div class="marker-info__stats" id="mi-stats"></div>
+                <div class="marker-info__tags" id="mi-tags"></div>
+                <button class="marker-info__select-btn" id="mi-select" disabled>✓ Choisir ce site de départ</button>
+              </div>
+
+              <div class="science-band">
+                <div class="science-band__icon">ℹ️</div>
+                <div class="science-band__text">
+                  <strong>Données réelles 2024-2025</strong> — Réseau d'émergence & CRFS Émergence. Les zones <strong style="color:#e8881a;">orange</strong> ont un sable chaud (>29.5°C, produisant des femelles) ; les zones <strong style="color:#25a99c;">turquoise</strong> ont un sable frais (&lt;28.5°C, produisant des mâles). Seuls les sites de ponte sont sélectionnables.
+                </div>
+              </div>
+
+              <div class="actions">
+                <button class="btn btn--ghost" data-goto="1">← Retour</button>
+                <button class="btn btn--cta" id="btn-step3-next" disabled>Valider et continuer <span class="arrow">→</span></button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====== ÉTAPE 4 — RÉSUMÉ & LANCEMENT ====== -->
+          <section class="panel" id="screen-launch" data-step="3" hidden>
+            <div class="card card--center">
+              <span class="kicker">Prêt à plonger</span>
+              <h2 class="card__title">Récapitulatif de ta tortue</h2>
+              <p class="card__subtitle">Vérifie les informations avant de te lancer dans l'aventure.</p>
+              <div class="recap-preview">
+                <div class="preview__frame" style="width:200px;height:200px;"><div class="preview__svg" id="launch-turtle"></div></div>
+              </div>
+              <div class="recap-grid">
+                <div class="recap-row">
+                  <div class="recap-row__icon">🐢</div>
+                  <div><div class="recap-row__label">Prénom</div><div class="recap-row__value" id="recap-name">—</div></div>
+                </div>
+                <div class="recap-row">
+                  <div class="recap-row__icon" id="recap-gender-icon">♂</div>
+                  <div><div class="recap-row__label">Genre</div><div class="recap-row__value" id="recap-gender">—</div></div>
+                </div>
+                <div class="recap-row">
+                  <div class="recap-row__icon">📍</div>
+                  <div><div class="recap-row__label">Lieu de départ</div><div class="recap-row__value" id="recap-origin">—</div></div>
+                </div>
+                <div class="recap-row">
+                  <div class="recap-row__icon">🌡️</div>
+                  <div>
+                    <div class="recap-row__label">Température du nid</div>
+                    <div class="recap-row__value" id="recap-temp">—</div>
+                    <span class="recap-row__temp" id="recap-temp-badge"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="actions" style="justify-content:center;">
+                <button class="btn btn--ghost" data-goto="2">← Retour</button>
+                <button class="btn btn--cta btn--lg btn--cta--pulse" id="btn-launch">ENTRER DANS L'OCÉAN 🌊 <span class="arrow">→</span></button>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+
+      <footer class="app-footer"><p>Ocean Hackathon Toulon × Association Émergence — Protégeons les tortues de Méditerranée 🌊🐢</p></footer>
+    </div>
+
+    <!-- ============ MODALE ============ -->
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal">
+        <button class="modal__close" id="modal-close">✕</button>
+        <div class="modal__icon" id="modal-icon">ℹ️</div>
+        <h3 class="modal__title" id="modal-title"></h3>
+        <div class="modal__body" id="modal-body"></div>
+        <div class="modal__source" id="modal-source"></div>
+      </div>
+    </div>
+
+    <script>
+      /* ============================================================
+         DONNÉES — MARKERS DE LA CARTE
+         Types: nesting (sable chaud), nesting-cool (sable frais),
+                feeding, observation, danger
+         sandTemp: température du sable (°C) pour les sites de ponte
+         ============================================================ */
+      var MARKERS = [
+        // --- A) FOCUS TOULON & VAR ---
+        { id:"toulon", type:"nesting", subtype:"toulon", name:"Toulon / Plages du Var", region:"Var, France 🇫🇷", lat:43.116, lon:5.933,
+          x:42, y:36, color:"#9b59b6", sandTemp:30.2,
+          desc:"Zone clé d'observation et de suivi scientifique du réseau Émergence. Toulon est le cœur du projet Ocean Hackathon : les plages du Var sont surveillées chaque été pour détecter les nids exceptionnels de tortues caouanes.",
+          stats:[{label:"suivi",value:"actif"},{label:"temp. sable",value:"30.2°C"}],
+          tags:[{text:"Sable chaud >29.5°C",cls:"hot"},{text:"Femelles majoritaires",cls:"hot"},{text:"Ocean Hackathon Toulon"},{text:"Suivi CRFS"}] },
+        { id:"sanary", type:"nesting", name:"Sanary-sur-Mer", region:"Var, France 🇫🇷", lat:43.135, lon:5.778,
+          x:36, y:40, color:"#ff9f1c", sandTemp:31.0,
+          desc:"Record historique en 2025 : 108 œufs enregistrés, 76 émergences réussies. Le sable particulièrement chaud de Sanary produit majoritairement des femelles.",
+          stats:[{label:"œufs",value:"108"},{label:"émergences",value:"76"},{label:"année",value:"2025"},{label:"temp. sable",value:"31.0°C"}],
+          tags:[{text:"Sable chaud >29.5°C",cls:"hot"},{text:"Femelles majoritaires",cls:"hot"},{text:"Sanctuaire Pelagos"},{text:"Courant liguro-provençal"}] },
+        { id:"cavalaire", type:"nesting", name:"Cavalaire-sur-Mer", region:"Var, France 🇫🇷", lat:43.175, lon:6.534,
+          x:52, y:42, color:"#ff9f1c", sandTemp:29.8,
+          desc:"57 œufs recensés à Cavalaire-sur-Mer en 2025. Zone de ponte en développement sur le littoral varois, près du golfe de Saint-Tropez.",
+          stats:[{label:"œufs",value:"57"},{label:"année",value:"2025"},{label:"temp. sable",value:"29.8°C"}],
+          tags:[{text:"Sable chaud >29.5°C",cls:"hot"},{text:"Femelles majoritaires",cls:"hot"},{text:"Golfe de Saint-Tropez"}] },
+        { id:"hyeres", type:"nesting", name:"Hyères & Presqu'île de Giens", region:"Var, France 🇫🇷", lat:43.041, lon:6.150,
+          x:48, y:36, color:"#ff9f1c", sandTemp:30.5,
+          desc:"Zone de ponte historique, incluant la célèbre plage de l'Almanarre. Site de suivi scientifique de longue date par l'Association Émergence.",
+          stats:[{label:"site",value:"historique"},{label:"plage",value:"Almanarre"},{label:"temp. sable",value:"30.5°C"}],
+          tags:[{text:"Sable chaud >29.5°C",cls:"hot"},{text:"Femelles majoritaires",cls:"hot"},{text:"Presqu'île de Giens"},{text:"Suivi historique"}] },
+
+        // --- B) AUTRES ZONES DE PONTE ---
+        { id:"argeles", type:"nesting-cool", name:"Argelès-sur-Mer / Occitanie", region:"Occitanie, France 🇫🇷", lat:42.560, lon:3.047,
+          x:18, y:56, color:"#2ec4b6", sandTemp:27.8,
+          desc:"Nidification rare en 2025 : 77 œufs découverts, 76 émergences réussies. Le sable plus frais de cette côte produit majoritairement des mâles — un phénomène de plus en plus rare avec le réchauffement.",
+          stats:[{label:"œufs",value:"77"},{label:"émergences",value:"76"},{label:"année",value:"2025"},{label:"temp. sable",value:"27.8°C"}],
+          tags:[{text:"Sable frais <28.5°C",cls:"cool"},{text:"Mâles majoritaires",cls:"cool"},{text:"Parc marin Golfe du Lion"},{text:"Rare en Méditerranée"}] },
+        { id:"golfe-juan", type:"nesting", name:"Vallauris - Golfe-Juan", region:"Alpes-Maritimes, France 🇫🇷", lat:43.564, lon:7.072,
+          x:62, y:32, color:"#ff9f1c", sandTemp:30.0,
+          desc:"82 œufs détectés lors du nettoyage des plages à Vallauris-Golfe-Juan en 2025. Zone urbanisée sous surveillance renforcée pour protéger les nids découverts fortuitement.",
+          stats:[{label:"œufs",value:"82"},{label:"année",value:"2025"},{label:"temp. sable",value:"30.0°C"}],
+          tags:[{text:"Sable chaud >29.5°C",cls:"hot"},{text:"Femelles majoritaires",cls:"hot"},{text:"Aire marine protégée"},{text:"Découverte fortuite"}] },
+        { id:"barcares", type:"nesting-cool", name:"Le Barcarès / Leucate", region:"Occitanie, France 🇫🇷", lat:42.830, lon:3.042,
+          x:20, y:50, color:"#2ec4b6", sandTemp:28.0,
+          desc:"87 œufs enregistrés au Barcarès/Leucate en 2025. Les plages sableuses de la côte languedocienne, au sable plus frais, produisent des mâles — de plus en plus rares.",
+          stats:[{label:"œufs",value:"87"},{label:"année",value:"2025"},{label:"temp. sable",value:"28.0°C"}],
+          tags:[{text:"Sable frais <28.5°C",cls:"cool"},{text:"Mâles majoritaires",cls:"cool"},{text:"Côte languedocienne"},{text:"Nidification émergente"}] },
+
+        // --- D) NOURRISSAGE ---
+        { id:"baleares", type:"feeding", name:"Îles Baléares", region:"Espagne 🇪🇸", lat:39.600, lon:2.600,
+          x:28, y:74, color:"#2ec4b6", sandTemp:null,
+          desc:"Zone de nourrissage majeure. Les herbiers de posidonies abritent d'abondantes concentrations de méduses — la nourriture principale des tortues caouanes.",
+          stats:[{label:"méduses",value:"abondantes"},{label:"posidonies",value:"denses"}],
+          tags:[{text:"Zone de nourrissage"},{text:"Herbiers de posidonies"},{text:"Parc national Cabrera"}] },
+        { id:"ligurie", type:"feeding", name:"Mer Ligurienne", region:"Au large de Nice, France 🇫🇷", lat:43.700, lon:7.800,
+          x:68, y:26, color:"#2ec4b6", sandTemp:null,
+          desc:"Forte concentration de méduses pelagia, nourriture essentiel des tortues. Les courants saisonniers concentrent les proies dans cette zone du Sanctuaire Pelagos.",
+          stats:[{label:"méduses",value:"concentrées"},{label:"courant",value:"liguro-provençal"}],
+          tags:[{text:"Zone de nourrissage"},{text:"Sanctuaire Pelagos"}] },
+
+        // --- E) OBSERVATION ---
+        { id:"port-cros", type:"observation", name:"Parc National de Port-Cros", region:"Porquerolles & Cap Lardier, France 🇫🇷", lat:43.000, lon:6.400,
+          x:46, y:40, color:"#4a8ac4", sandTemp:null,
+          desc:"Parc national marin incluant Porquerolles et Cap Lardier. Sentiers sous-marins éco-responsables et réseaux d'observation pour les touristes. Un modèle de protection de la biodiversité marine.",
+          stats:[{label:"sentiers",value:"3"},{label:"réseau",value:"éco-responsable"}],
+          tags:[{text:"Parc national"},{text:"Sentiers sous-marins"},{text:"Biodiversité protégée"},{text:"Tourisme responsable"}] },
+
+        // --- F) DANGERS ---
+        { id:"grau-du-roi", type:"danger", name:"Grau-du-Roi / Port-Saint-Louis", region:"Golfe du Lion, France 🇫🇷", lat:43.730, lon:4.730,
+          x:32, y:48, color:"#e74c3c", sandTemp:null,
+          desc:"Zone à fort trafic maritime et présence de filets de pêche. Risques majeurs de collisions avec les bateaux (fracture de la dossière) et captures accidentelles dans les filets (nageoires abîmées).",
+          stats:[{label:"trafic",value:"élevé"},{label:"filets",value:"actifs"}],
+          tags:[{text:"Trafic maritime",cls:"danger"},{text:"Filets de pêche",cls:"danger"},{text:"Risque de collision",cls:"danger"},{text:"Captures accidentelles",cls:"danger"}] },
+        { id:"plastic-zone", type:"danger", name:"Zone de pollution plastique", region:"Large de la Côte d'Azur, France 🇫🇷", lat:43.400, lon:7.200,
+          x:56, y:36, color:"#e74c3c", sandTemp:null,
+          desc:"Forte concentration de déchets plastiques flottants. Les sacs plastiques sont confondus avec des méduses par les tortues, provoquant des blocages intestinaux et une mort par inanition.",
+          stats:[{label:"plastique",value:"élevé"},{label:"risque",value:"ingestion"}],
+          tags:[{text:"Pollution plastique",cls:"danger"},{text:"Confusion méduse/sac",cls:"danger"},{text:"Blocage intestinal",cls:"danger"}] },
+      ];
+
+      /* ============================================================
+         ÉTAT GLOBAL DU JOUEUR
+         ============================================================ */
+      var playerData = {
+        name: "",
+        gender: "",
+        colorTheme: "male",
+        origin: {},
+        sandTemp: ""
+      };
+
+      var currentStep = 0;
+      var activeLayer = "all";
+
+      /* ============================================================
+         SVG TORTUE
+         ============================================================ */
+      function turtleSVG(shellAccent, size) {
+        size = size || 170;
+        shellAccent = shellAccent || "#0a3c59";
+        var gid = "tg" + Math.random().toString(36).slice(2, 8);
+        var lightShell = shellAccent === "#ff9f1c" ? "#ffd0a0" : "#5fe0d2";
+        var midShell = shellAccent === "#ff9f1c" ? "#ff9f1c" : "#2ec4b6";
+        var darkShell = shellAccent === "#ff9f1c" ? "#c8541a" : "#1d8b80";
+        return '<svg viewBox="0 0 200 200" width="'+size+'" height="'+size+'" role="img" aria-label="Tortue marine vue de dessus">' +
+          '<defs><radialGradient id="'+gid+'s" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="'+lightShell+'"/><stop offset="55%" stop-color="'+midShell+'"/><stop offset="100%" stop-color="'+darkShell+'"/></radialGradient><radialGradient id="'+gid+'f" cx="50%" cy="40%" r="70%"><stop offset="0%" stop-color="'+(shellAccent==="#ff9f1c"?"#ffb070":"#3bb6a8")+'"/><stop offset="100%" stop-color="'+darkShell+'"/></radialGradient><clipPath id="'+gid+'c"><ellipse cx="100" cy="105" rx="52" ry="62"/></clipPath></defs>' +
+          '<ellipse cx="48" cy="70" rx="20" ry="36" fill="url(#'+gid+'f)" transform="rotate(-35 48 70)"/><ellipse cx="152" cy="70" rx="20" ry="36" fill="url(#'+gid+'f)" transform="rotate(35 152 70)"/><ellipse cx="62" cy="150" rx="14" ry="26" fill="url(#'+gid+'f)" transform="rotate(-18 62 150)"/><ellipse cx="138" cy="150" rx="14" ry="26" fill="url(#'+gid+'f)" transform="rotate(18 138 150)"/>' +
+          '<ellipse cx="100" cy="38" rx="18" ry="20" fill="url(#'+gid+'f)"/><circle cx="93" cy="34" r="3.2" fill="#0a3c59"/><circle cx="107" cy="34" r="3.2" fill="#0a3c59"/><circle cx="94" cy="33" r="1.1" fill="#fff"/><circle cx="108" cy="33" r="1.1" fill="#fff"/>' +
+          '<ellipse cx="100" cy="105" rx="52" ry="62" fill="url(#'+gid+'s)" stroke="'+darkShell+'" stroke-width="3"/>' +
+          '<g clip-path="url(#'+gid+'c)"><ellipse cx="100" cy="78" rx="22" ry="18" fill="none" stroke="'+shellAccent+'" stroke-width="2.5" opacity="0.55"/><ellipse cx="100" cy="108" rx="28" ry="20" fill="none" stroke="'+shellAccent+'" stroke-width="2.5" opacity="0.55"/><ellipse cx="100" cy="138" rx="22" ry="16" fill="none" stroke="'+shellAccent+'" stroke-width="2.5" opacity="0.55"/><path d="M100 52 V158" stroke="'+shellAccent+'" stroke-width="2" opacity="0.4"/><path d="M74 70 Q100 110 74 150" fill="none" stroke="'+shellAccent+'" stroke-width="2" opacity="0.4"/><path d="M126 70 Q100 110 126 150" fill="none" stroke="'+shellAccent+'" stroke-width="2" opacity="0.4"/><ellipse cx="86" cy="82" rx="14" ry="20" fill="#fff" opacity="0.18"/></g>' +
+          '<circle cx="100" cy="52" r="3" fill="#ffe0b0"/><circle cx="130" cy="58" r="2.5" fill="#ffe0b0"/><circle cx="70" cy="58" r="2.5" fill="#ffe0b0"/></svg>';
+      }
+      function turtleAccent() { return playerData.gender === "female" ? "#ff9f1c" : "#0a3c59"; }
+
+      /* ============================================================
+         BULLES
+         ============================================================ */
+      (function() {
+        var c = document.getElementById("bubbles");
+        for (var i = 0; i < 14; i++) {
+          var b = document.createElement("span"); b.className = "bubble";
+          var s = 6 + Math.round(Math.random() * 22);
+          b.style.width = s + "px"; b.style.height = s + "px";
+          b.style.left = Math.random() * 100 + "%";
+          b.style.animationDuration = (6 + Math.random() * 6) + "s";
+          b.style.animationDelay = Math.random() * 7 + "s";
+          c.appendChild(b);
+        }
+      })();
+
+      /* ============================================================
+         RENDUS INITIAUX
+         ============================================================ */
+      document.getElementById("hero-turtle").innerHTML = turtleSVG("#2ec4b6", 140);
+      document.getElementById("preview-turtle").innerHTML = turtleSVG("#0a3c59", 160);
+      document.getElementById("launch-turtle").innerHTML = turtleSVG("#0a3c59", 180);
+
+      /* ============================================================
+         CARTE — PINS & FILTRES
+         ============================================================ */
+      function renderPins() {
+        var container = document.getElementById("map-pins");
+        container.innerHTML = "";
+        MARKERS.forEach(function(m) {
+          if (activeLayer !== "all" && m.type !== activeLayer && !(activeLayer === "nesting" && m.type === "nesting-cool")) return;
+          var pin = document.createElement("div");
+          var pinClass = "map-pin map-pin--" + m.type;
+          if (m.subtype === "toulon") pinClass += " map-pin--toulon";
+          pin.className = pinClass;
+          if (playerData.origin && playerData.origin.id === m.id) pin.classList.add("map-pin--selected");
+          pin.style.left = m.x + "%"; pin.style.top = m.y + "%";
+          pin.setAttribute("data-marker", m.id);
+          pin.innerHTML = '<div class="map-pin__dot"></div><div class="map-pin__label">' + m.name + '</div>';
+          pin.addEventListener("click", function() { showMarkerInfo(m.id); });
+          container.appendChild(pin);
+        });
+      }
+
+      function updateFilterCounts() {
+        var counts = { all: MARKERS.length, nesting: 0, feeding: 0, observation: 0, danger: 0 };
+        MARKERS.forEach(function(m) {
+          if (m.type === "nesting" || m.type === "nesting-cool") counts.nesting++;
+          else if (m.type === "feeding") counts.feeding++;
+          else if (m.type === "observation") counts.observation++;
+          else if (m.type === "danger") counts.danger++;
+        });
+        document.getElementById("count-all").textContent = counts.all;
+        document.getElementById("count-nesting").textContent = counts.nesting;
+        document.getElementById("count-feeding").textContent = counts.feeding;
+        document.getElementById("count-observation").textContent = counts.observation;
+        document.getElementById("count-danger").textContent = counts.danger;
+      }
+
+      document.querySelectorAll(".filter-btn").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+          document.querySelectorAll(".filter-btn").forEach(function(b) { b.classList.remove("is-active"); });
+          btn.classList.add("is-active");
+          activeLayer = btn.getAttribute("data-layer");
+          renderPins();
+        });
+      });
+
+      function showMarkerInfo(markerId) {
+        var m = MARKERS.find(function(x) { return x.id === markerId; });
+        if (!m) return;
+        var dot = document.getElementById("mi-dot");
+        dot.style.background = m.color;
+        document.getElementById("mi-title").textContent = m.name;
+        document.getElementById("mi-coords").textContent = m.lat + "°N, " + m.lon + "°E — " + m.region;
+        document.getElementById("mi-desc").textContent = m.desc;
+
+        // Stats
+        var statsHtml = m.stats.map(function(s) {
+          var cls = "";
+          if (s.label.indexOf("temp") >= 0 && m.sandTemp !== null) {
+            cls = m.sandTemp >= 29.5 ? "stat-pill--temp hot" : "stat-pill--temp cool";
+          }
+          return '<span class="stat-pill '+cls+'"><strong>' + s.value + '</strong> ' + s.label + '</span>';
+        }).join("");
+        document.getElementById("mi-stats").innerHTML = statsHtml;
+
+        // Tags
+        var tagsHtml = m.tags.map(function(t) {
+          var cls = t.cls ? "marker-info__tag--" + t.cls : "";
+          return '<span class="marker-info__tag '+cls+'">' + (t.cls === "danger" ? "⚠️ " : "📍 ") + t.text + '</span>';
+        }).join("");
+        document.getElementById("mi-tags").innerHTML = tagsHtml;
+
+        // Select button
+        var selectBtn = document.getElementById("mi-select");
+        var isNesting = m.type === "nesting" || m.type === "nesting-cool";
+        if (isNesting) {
+          selectBtn.disabled = false;
+          var isSelected = playerData.origin && playerData.origin.id === m.id;
+          selectBtn.textContent = isSelected ? "✓ Site sélectionné" : "✓ Choisir ce site de départ";
+          selectBtn.classList.toggle("is-selected", isSelected);
+          selectBtn.onclick = function() { selectOrigin(m); };
+        } else {
+          selectBtn.disabled = true;
+          selectBtn.textContent = m.type === "danger" ? "⚠️ Zone de danger — non sélectionnable" : "ℹ️ Zone d'information — non sélectionnable";
+          selectBtn.classList.remove("is-selected");
+        }
+        document.getElementById("marker-info").classList.add("is-visible");
+      }
+
+      function selectOrigin(m) {
+        playerData.origin = { id: m.id, name: m.name, region: m.region, lat: m.lat, lon: m.lon, sandTemp: m.sandTemp };
+        playerData.sandTemp = m.sandTemp !== null ? m.sandTemp + "°C" : "";
+        renderPins();
+        showMarkerInfo(m.id);
+        document.getElementById("btn-step3-next").disabled = false;
+      }
+
+      /* ============================================================
+         GENRE — THÈME
+         ============================================================ */
+      function applyTheme(gender) {
+        playerData.gender = gender;
+        playerData.colorTheme = gender;
+        document.body.setAttribute("data-theme", gender);
+        var accent = gender === "female" ? "#ff9f1c" : "#0a3c59";
+        document.getElementById("preview-turtle").innerHTML = turtleSVG(accent, 160);
+        document.getElementById("launch-turtle").innerHTML = turtleSVG(accent, 180);
+        updatePreviewBadge();
+      }
+
+      document.querySelectorAll(".gender-card").forEach(function(card) {
+        card.addEventListener("click", function() {
+          document.querySelectorAll(".gender-card").forEach(function(c) { c.classList.remove("is-selected"); c.setAttribute("aria-pressed", "false"); });
+          card.classList.add("is-selected"); card.setAttribute("aria-pressed", "true");
+          applyTheme(card.getAttribute("data-gender"));
+          updateStep2State();
+        });
+      });
+
+      function updatePreviewBadge() {
+        var badge = document.getElementById("preview-badge");
+        var parts = [];
+        if (playerData.name) parts.push(playerData.name);
+        if (playerData.gender) parts.push(playerData.gender === "female" ? "Femelle ♀" : "Mâle ♂");
+        badge.textContent = parts.length > 0 ? parts.join(" — ") + " — Tortue de Méditerranée" : "En attente de personnalisation...";
+      }
+
+      /* ============================================================
+         NOM
+         ============================================================ */
+      var nameInput = document.getElementById("turtle-name");
+      nameInput.addEventListener("input", function(e) {
+        playerData.name = e.target.value;
+        document.getElementById("name-count").textContent = e.target.value.length + "/24 caractères";
+        document.getElementById("name-valid").classList.toggle("is-visible", e.target.value.trim().length > 0);
+        updatePreviewBadge();
+        updateStep2State();
+      });
+      document.querySelectorAll("[data-suggest]").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+          nameInput.value = btn.getAttribute("data-suggest");
+          nameInput.dispatchEvent(new Event("input"));
+        });
+      });
+      function updateStep2State() {
+        var nameOk = playerData.name.trim().length > 0;
+        var genderOk = playerData.gender !== "";
+        document.getElementById("btn-step2-next").disabled = !(nameOk && genderOk);
+      }
+
+      /* ============================================================
+         NAVIGATION
+         ============================================================ */
+      var SCREENS = ["screen-story", "screen-customize", "screen-map", "screen-launch"];
+      function goTo(stepIndex) {
+        if (stepIndex < 0 || stepIndex >= SCREENS.length) return;
+        var current = document.querySelector(".panel--active");
+        var next = document.getElementById(SCREENS[stepIndex]);
+        if (current && current.id === SCREENS[stepIndex]) return;
+        if (current) {
+          current.classList.remove("panel--active"); current.classList.add("panel--leaving");
+          var toHide = current;
+          setTimeout(function() { toHide.classList.remove("panel--leaving"); toHide.setAttribute("hidden", ""); }, 300);
+        }
+        setTimeout(function() { next.removeAttribute("hidden"); next.classList.add("panel--active"); }, 50);
+        currentStep = stepIndex;
+        updateStepper(stepIndex);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        if (stepIndex === 2) { renderPins(); updateFilterCounts(); }
+        if (stepIndex === 3) updateLaunchScreen();
+      }
+      function updateStepper(idx) {
+        document.querySelectorAll(".stepper__item").forEach(function(item, i) {
+          item.classList.remove("stepper__item--active", "stepper__item--done", "stepper__item--todo");
+          if (i === idx) item.classList.add("stepper__item--active");
+          else if (i < idx) item.classList.add("stepper__item--done");
+          else item.classList.add("stepper__item--todo");
+          item.querySelector(".stepper__dot").textContent = i < idx ? "✓" : (i + 1);
+        });
+      }
+      document.querySelectorAll("[data-goto]").forEach(function(btn) {
+        btn.addEventListener("click", function() { goTo(parseInt(btn.getAttribute("data-goto"), 10)); });
+      });
+      document.getElementById("btn-step1-next").addEventListener("click", function() { goTo(1); });
+      document.getElementById("btn-step2-next").addEventListener("click", function() { goTo(2); });
+      document.getElementById("btn-step3-next").addEventListener("click", function() { goTo(3); });
+      document.getElementById("btn-launch").addEventListener("click", function() {
+        playerData.ready = true;
+        openModal("launch");
+      });
+
+      /* ============================================================
+         ÉCRAN LANCEMENT
+         ============================================================ */
+      function updateLaunchScreen() {
+        var name = playerData.name.trim() || "—";
+        var gender = playerData.gender === "female" ? "Femelle ♀" : playerData.gender === "male" ? "Mâle ♂" : "—";
+        var origin = playerData.origin.name || "—";
+        var temp = playerData.sandTemp || "—";
+        var tempVal = playerData.origin.sandTemp;
+        var tempBadge = document.getElementById("recap-temp-badge");
+        document.getElementById("recap-name").textContent = name;
+        document.getElementById("recap-gender").textContent = gender;
+        document.getElementById("recap-gender-icon").textContent = playerData.gender === "female" ? "♀" : "♂";
+        document.getElementById("recap-origin").textContent = origin;
+        document.getElementById("recap-temp").textContent = temp;
+        if (tempVal !== null && tempVal !== undefined) {
+          var isHot = tempVal >= 29.5;
+          tempBadge.textContent = isHot ? "Sable chaud → Femelles ♀" : "Sable frais → Mâles ♂";
+          tempBadge.className = "recap-row__temp " + (isHot ? "recap-row__temp--hot" : "recap-row__temp--cool");
+        } else {
+          tempBadge.textContent = "";
+        }
+        document.getElementById("launch-turtle").innerHTML = turtleSVG(turtleAccent(), 180);
+      }
+
+      /* ============================================================
+         MODALE
+         ============================================================ */
+      function openModal(key) {
+        var icon, title, body, source;
+        if (key === "launch") {
+          var o = playerData.origin;
+          icon = "🌊"; title = "Prêt à jouer !";
+          body = "<p>Ta tortue <strong>" + (playerData.name || "sans nom") + "</strong> est prête à plonger.</p>" +
+            "<p>Genre : <strong>" + (playerData.gender === "female" ? "Femelle ♀" : "Mâle ♂") + "</strong><br>" +
+            "Lieu de départ : <strong>" + (o.name || "—") + "</strong><br>" +
+            "Température du nid : <strong>" + (playerData.sandTemp || "—") + "</strong></p>" +
+            "<p>Le gameplay se lance avec le thème <strong>" + (playerData.gender === "female" ? "couleurs chaudes" : "couleurs froides") + "</strong>.</p>";
+          source = "Ocean Hackathon Toulon × Association Émergence — 2025";
+        } else {
+          icon = "⚙️"; title = "Paramètres du jeu";
+          body = "<p>Jeu éducatif — Ocean Hackathon Toulon × Association Émergence.</p><p><strong>Version :</strong> Démo onboarding</p><p>Thème actuel : <strong>" + (playerData.gender === "female" ? "Femelle (couleurs chaudes)" : playerData.gender === "male" ? "Mâle (couleurs froides)" : "Non défini") + "</strong></p>";
+          source = "Version démo — 2025";
+        }
+        document.getElementById("modal-icon").textContent = icon;
+        document.getElementById("modal-title").textContent = title;
+        document.getElementById("modal-body").innerHTML = body;
+        document.getElementById("modal-source").textContent = source;
+        document.getElementById("modal-overlay").classList.add("is-open");
+      }
+      function closeModal() { document.getElementById("modal-overlay").classList.remove("is-open"); }
+      document.getElementById("modal-close").addEventListener("click", closeModal);
+      document.getElementById("modal-overlay").addEventListener("click", function(e) { if (e.target === this) closeModal(); });
+      document.getElementById("btn-settings").addEventListener("click", function() { openModal("settings"); });
+
+      // Init
+      updateFilterCounts();
+      renderPins();
+    </script>
+  </body>
+</html>
