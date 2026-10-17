@@ -1,0 +1,27 @@
+{
+  "name": "oceanhackaton2026",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulnord03/OceanHackaton2026.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/paulnord03/OceanHackaton2026/issues"
+  },
+  "homepage": "https://github.com/paulnord03/OceanHackaton2026#readme",
+  "dependencies": {
+    "phaser": "^4.2.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}
