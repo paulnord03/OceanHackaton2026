@@ -5,12 +5,12 @@ import GameScene from './scenes/GameScene.js';
 
 new Phaser.Game({
   type: Phaser.AUTO,
-  width: 480,
-  height: 800,
+  // Le jeu occupe toute la fenêtre et suit son redimensionnement
+  width: window.innerWidth,
+  height: window.innerHeight,
   backgroundColor: '#0b2a3d',
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    mode: Phaser.Scale.RESIZE,
   },
   scene: [BootScene, MenuScene, MapScene, GameScene],
 });
