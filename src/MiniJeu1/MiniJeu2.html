@@ -154,7 +154,7 @@ h1,h2,.title{font-family:"Baloo 2","Nunito",system-ui,sans-serif;font-weight:800
         <div><b id="end-time">0 s</b><span>de jeu</span></div>
       </div>
       <p class="fact" id="end-fact">Le savais-tu ? Les tortues caouannes confondent souvent les sacs plastiques avec des méduses.</p>
-      <div style="margin-top:16px"><button class="btn big" id="restart-btn" type="button">Recommencer</button></div>
+      <div style="margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn big" id="restart-btn" type="button">Recommencer</button><a class="btn big" id="continue-btn" href="MiniJeu3.html" style="display:none;text-decoration:none">Continuer</a></div>
     </div>
   </div>
 
@@ -1246,6 +1246,7 @@ const TurtleGame = {
           $("end-reason").textContent = s.endReason;
           $("end-food").textContent = s.food; $("end-turtles").textContent = s.turtles; $("end-time").textContent = s.time + " s";
           $("end-fact").style.display = won ? "none" : "block";
+          $("continue-btn").style.display = won ? "inline-block" : "none";
         }
       }
     };
