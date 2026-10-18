@@ -10,7 +10,9 @@ export default class MenuScene extends Phaser.Scene {
       fontSize: '36px', color: '#ffffff', fontStyle: 'bold', align: 'center',
     }).setOrigin(0.5);
 
-    this.makeButton(width / 2, height * 0.5, 'Jouer', () => this.scene.start('MapScene'));
+    // CHANGEMENT ICI : Redirige vers IntroScene (ta page Bolt) au lieu de MapScene
+    this.makeButton(width / 2, height * 0.5, 'Jouer', () => this.scene.start('IntroScene'));
+    
     this.makeButton(width / 2, height * 0.62, 'Réinitialiser la progression', () => {
       Progress.reset();
     }, 20);

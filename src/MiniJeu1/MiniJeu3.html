@@ -64,6 +64,10 @@ p{line-height:1.55;margin:.7em 0}
 .saved{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin:14px 0}
 .saved img{width:46px;height:auto}
 .score{font-family:"Fredoka",sans-serif;font-size:3.2rem;font-weight:600;color:var(--coral)}
+a.btn{display:inline-block;text-decoration:none}
+.actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+.btn.alt{background:var(--sea-mid);box-shadow:0 5px 0 var(--sea-deep)}
+.btn.alt:active{box-shadow:0 2px 0 var(--sea-deep)}
 .hide{display:none!important}
 @media (prefers-reduced-motion:reduce){.swimmer,.swimmer img,.bubble,.hero-turtle{animation:none!important}.swimmer{left:20%}}
 </style>
@@ -92,7 +96,11 @@ p{line-height:1.55;margin:.7em 0}
     <div class="score" id="final"></div>
     <div class="saved" id="saved"></div>
     <p id="msg" class="lead"></p>
-    <button class="btn" id="again">Rejouer</button>
+    <p id="need" class="lead hide">Il faut au moins 5 / 10 pour passer au jeu suivant.</p>
+    <div class="actions">
+      <a class="btn" id="continue" href="MiniJeu4.html">Continuer</a>
+      <button class="btn alt" id="again">Rejouer</button>
+    </div>
   </section>
 </main>
 
@@ -181,7 +189,12 @@ function finish(){
     :score>=7?"Très bien ! Tu connais bien la tortue caouanne. Encore un essai pour le sans-faute ?"
     :score>=4?"Pas mal ! Rejoue pour mieux la connaître et mieux la protéger."
     :"C’est un début. Rejoue : chaque réponse t’apprend quelque chose sur ces tortues.";
+  const pass=score>=5;
+  $("continue").classList.toggle("hide",!pass);
+  $("need").classList.toggle("hide",pass);
+  $("again").classList.toggle("alt",pass);
   show("end");
+  if(pass)$("continue").focus();
 }
 $("go").onclick=start;$("next").onclick=next;$("again").onclick=start;
 </script>

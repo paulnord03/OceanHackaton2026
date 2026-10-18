@@ -1,21 +1,34 @@
 import { LEVELS } from '../data/levels.js';
 import { Progress } from '../systems/Progress.js';
 
-// Mode debug : ouvrez http://localhost:8080/?debug
-// puis cliquez sur la carte pour obtenir les coordonnées normalisées.
-const DEBUG = new URLSearchParams(window.location.search).has('debug');
-const DRAG_THRESHOLD = 10; // px : en dessous c'est un clic, au-dessus un défilement
+// Importe directement le fichier image pour que Vite / Webpack résolve le bon chemin
+import carteImg from '../Assets/images/carte.png';
 
-export default class MapScene extends Phaser.Scene {
+const DEBUG = new URLSearchParams(window.location.search).has('debug');
+const DRAG_THRESHOLD = 10;
+
+export default class Mapscene extends Phaser.Scene {
   constructor() {
-    super('MapScene');
+    super('Mapscene');
+  }
+
+  // 1. AJOUTE LE PRELOAD ICI
+  preload() {
+    // Charge l'image de la carte avec la clé 'carte'
+    this.load.image('carte', carteImg);
+
+    // Charge également les images des niveaux si elles sont dans Assets/images/
+    LEVELS.forEach((level) => {
+      this.load.image(level.texture, level.image);
+    });
   }
 
   create() {
     this.cameras.main.fadeIn(250);
 
-    // Ordre de création = ordre d'affichage : carte < chemin < boutons
+    // 2. Cette ligne affichera désormais la vraie image 'carte.png' !
     this.map = this.add.image(0, 0, 'carte').setOrigin(0, 0);
+    
     this.pathGraphics = this.add.graphics();
     this.nodes = LEVELS.map((level) => this.createNode(level));
 
@@ -23,20 +36,16 @@ export default class MapScene extends Phaser.Scene {
     this.createBackButton();
     if (DEBUG) this.setupDebug();
 
-    // Placement de tous les éléments selon la taille de la fenêtre
     this.layout();
 
-    // Au départ, la caméra se centre sur le niveau en cours
     const current = Progress.getCurrentLevel();
     this.cameras.main.centerOn(current.x * this.mapW, current.y * this.mapH);
 
-    // Re-placement automatique si la fenêtre est redimensionnée
     this.scale.on('resize', this.layout, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off('resize', this.layout, this);
     });
   }
-
   // ---------------------------------------------------------------
   // Mise en page : la carte COUVRE toute la fenêtre (pas de bandes vides).
   // Si elle dépasse, on peut la faire défiler.
@@ -164,11 +173,19 @@ export default class MapScene extends Phaser.Scene {
   startLevel(level) {
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.start('GameScene', {
-        levelId: level.id,
-        levelName: level.name,
-        ...level.params,
-      });
+      
+      // Si c'est le niveau 1, on redirige vers le mini-jeu HTML
+      if (level.id === 1) {
+        window.location.href = '/src/MiniJeu1/tortue-crossy.html';
+      } else {
+        // Pour les autres niveaux, on lance la scène Phaser classique
+        this.scene.start('GameScene', {
+          levelId: level.id,
+          levelName: level.name,
+          ...level.params,
+        });
+      }
+
     });
   }
 

@@ -1,16 +1,14 @@
-import BootScene from './scenes/BootScene.js';
-import MenuScene from './scenes/MenuScene.js';
-import MapScene from './scenes/Mapscene.js';
-import GameScene from './scenes/GameScene.js';
+import Phaser from 'phaser';
+// Importez votre scène (ex: Mapscene)
+import Mapscene from './scenes/Mapscene'; 
 
-new Phaser.Game({
+const config = {
   type: Phaser.AUTO,
-  // Le jeu occupe toute la fen�tre et suit son redimensionnement
+  parent: 'game-container',
   width: window.innerWidth,
   height: window.innerHeight,
-  backgroundColor: '#0b2a3d',
-  scale: {
-    mode: Phaser.Scale.RESIZE,
-  },
-  scene: [BootScene, MenuScene, MapScene, GameScene],
-});
+  scene: [Mapscene]
+};
+
+// CRUCIAL : Attacher à window.game
+window.game = new Phaser.Game(config);

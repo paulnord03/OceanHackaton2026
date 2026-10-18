@@ -27,7 +27,7 @@ button:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
 <canvas id="c" width="1920" height="1080"></canvas>
 <div id="clue" class="panel"><canvas id="ico" width="140" height="96"></canvas><div><b id="ct"></b><small id="lv"></small></div></div>
 <div id="stats" class="panel"><span id="tm">0:00</span><span id="er">Oups : 0</span><button id="re" title="Nouvelle partie" aria-label="Nouvelle partie">↻</button><button id="mu" title="Son" aria-label="Couper le son">🔊</button></div>
-<div id="win" class="panel hidden"><h1>Bravo !</h1><p id="wp"></p><div><button id="again">Rejouer</button><button id="next">Niveau suivant</button></div></div>
+<div id="win" class="panel hidden"><h1>Bravo !</h1><p id="wp"></p><div><button id="again">Rejouer</button><button id="next">Continuer</button></div></div>
 </div>
 <script>
 const W=1920,H=1080,cv=document.getElementById('c'),ctx=cv.getContext('2d',{alpha:false}),$=i=>document.getElementById(i);
@@ -115,7 +115,7 @@ function pickTurtle(t){
 function burst(){const cols=['#ffd02e','#ff6f59','#fff3cf','#8be3ea','#b6e07a','#ff9ecb'];conf.push({x:960+rnd(-60,60),y:560,vx:rnd(-900,900),vy:rnd(-1200,-200),c:pick(cols),r:rnd(0,6),vr:rnd(-9,9),s:rnd(10,22),life:rnd(2,4),circ:Math.random()<.4})}
 $('mu').onclick=()=>{muted=!muted;$('mu').textContent=muted?'🔇':'🔊'};
 $('re').onclick=$('again').onclick=()=>{newRound()};
-$('next').onclick=()=>{level++;newRound()};
+$('next').onclick=()=>{location.href='MiniJeu5.html'};
 /* boucle */
 function update(dt){time+=dt;if(!turtles.length)return;
  const f=Math.pow(.02,dt);

@@ -4,7 +4,7 @@ export default class BootScene extends Phaser.Scene {
   constructor() { super('BootScene'); }
 
   preload() {
-    // Si un fichier est introuvable, on génère un remplaçant pour pouvoir tester
+    // Si un fichier est introuvable, on gÃ©nÃ¨re un remplaÃ§ant pour pouvoir tester
     this.load.on('loaderror', (file) => {
       console.warn(`Fichier introuvable : ${file.src}`);
       if (file.key === 'carte') {

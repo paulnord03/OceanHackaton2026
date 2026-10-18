@@ -1,0 +1,1335 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>L'Aventure des Tortues de Méditerranée — Ocean Hackathon Toulon</title>
+    <meta
+      name="description"
+      content="Jeu scientifique sur les tortues marines de Méditerranée. Ocean Hackathon Toulon × Association Émergence."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Leaflet : carte réaliste (déplaçable à la souris / au doigt, zoom molette) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+      /* ============================================================
+         PALETTE — Double thème (Mâle froid / Femelle chaud)
+         ============================================================ */
+      :root {
+        --white: #ffffff;
+        --night: #0a3c59;
+        --ink: #0a3c59;
+        --ink-soft: rgba(10, 60, 89, 0.65);
+        --ink-faint: rgba(10, 60, 89, 0.4);
+        --tint: #e0f4f7;
+        --radius: 24px;
+        --radius-sm: 16px;
+        --radius-xs: 12px;
+        --font-display: "Fredoka", "Montserrat", system-ui, sans-serif;
+        --font-body: "Montserrat", system-ui, sans-serif;
+
+        /* Thème Mâle (froid) — par défaut */
+        --ocean-deep: #0a3c59;
+        --ocean-mid: #125a82;
+        --ocean-surface: #0d4a6b;
+        --accent: #2ec4b6;
+        --accent-dark: #25a99c;
+        --accent-light: #5fe0d2;
+        --accent-soft: #a8f0e8;
+        --accent-violet: #4a5a8a;
+        --cta: #ff9f1c;
+        --cta-dark: #e8881a;
+        --cta-light: #ffb85c;
+        --shadow-theme: 0 12px 40px -8px rgba(10, 60, 89, 0.3);
+        --shadow-lg: 0 24px 60px -12px rgba(10, 60, 89, 0.4);
+        --shadow-glow: 0 0 40px rgba(46, 196, 182, 0.5);
+        --shadow-cta: 0 0 30px rgba(255, 159, 28, 0.5);
+        --badge-bg: rgba(46, 196, 182, 0.12);
+        --badge-text: #25a99c;
+        --card-border: rgba(46, 196, 182, 0.25);
+        --bg-surface: linear-gradient(180deg, #0d4a6b 0%, #0a3c59 45%, #072c42 100%);
+      }
+      [data-theme="female"] {
+        --ocean-deep: #b84a18;
+        --ocean-mid: #d96a20;
+        --ocean-surface: #c85518;
+        --accent: #ff9f1c;
+        --accent-dark: #e8881a;
+        --accent-light: #ffb85c;
+        --accent-soft: #ffe19c;
+        --accent-violet: #d4593a;
+        --cta: #2ec4b6;
+        --cta-dark: #25a99c;
+        --cta-light: #5fe0d2;
+        --shadow-theme: 0 12px 40px -8px rgba(184, 74, 24, 0.35);
+        --shadow-lg: 0 24px 60px -12px rgba(184, 74, 24, 0.4);
+        --shadow-glow: 0 0 40px rgba(255, 159, 28, 0.5);
+        --shadow-cta: 0 0 30px rgba(46, 196, 182, 0.5);
+        --badge-bg: rgba(255, 159, 28, 0.14);
+        --badge-text: #b84a18;
+        --card-border: rgba(255, 159, 28, 0.3);
+        --bg-surface: linear-gradient(180deg, #d96a20 0%, #b84a18 45%, #8a3812 100%);
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+      body {
+        font-family: var(--font-body); color: var(--ink);
+        min-height: 100vh; background: var(--ocean-deep);
+        overflow-x: hidden; transition: background 0.6s ease;
+      }
+
+      /* Conteneur Phaser : présent (pour que Phaser calcule sa taille) mais invisible
+         tant que le joueur n'a pas cliqué sur « ENTRER DANS L'OCÉAN ». */
+      #game-container { position: fixed; inset: 0; z-index: -1; visibility: hidden; }
+      #game-container.is-live { z-index: 50; visibility: visible; }
+
+      /* ============================================================
+         FOND OCÉAN ANIMÉ
+         ============================================================ */
+      .ocean-bg {
+        position: fixed; inset: 0; z-index: 0; overflow: hidden;
+        background: var(--bg-surface); transition: background 0.6s ease;
+      }
+      .caustics {
+        position: absolute; inset: 0;
+        background-image:
+          radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--accent-light) 18%, transparent) 0%, transparent 35%),
+          radial-gradient(circle at 70% 60%, color-mix(in srgb, var(--accent-soft) 14%, transparent) 0%, transparent 40%),
+          radial-gradient(circle at 50% 80%, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 45%);
+        background-size: 200% 200%; animation: causticDrift 16s ease-in-out infinite;
+      }
+      @keyframes causticDrift { 0%,100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
+      .blob {
+        position: absolute; border-radius: 50%; filter: blur(70px);
+        opacity: 0.35; animation: blobDrift 14s ease-in-out infinite;
+      }
+      .blob-1 { left: -10%; top: 0; width: 50vw; height: 50vh; background: color-mix(in srgb, var(--accent) 20%, transparent); }
+      .blob-2 { right: -10%; top: 30%; width: 45vw; height: 45vh; background: color-mix(in srgb, var(--accent-light) 15%, transparent); animation-delay: 3s; }
+      .blob-3 { left: 25%; bottom: 0; width: 40vw; height: 40vh; background: color-mix(in srgb, var(--cta) 8%, transparent); animation-delay: 5s; }
+      @keyframes blobDrift { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-20px) scale(1.1); } }
+      .ripple {
+        position: absolute; border: 2px solid color-mix(in srgb, var(--accent-light) 25%, transparent);
+        border-radius: 50%; animation: rippleExpand 5s ease-out infinite;
+      }
+      .ripple-1 { left: 12%; top: 14%; width: 90px; height: 90px; }
+      .ripple-2 { right: 18%; top: 22%; width: 120px; height: 120px; animation-delay: 1.5s; }
+      .ripple-3 { left: 45%; top: 8%; width: 70px; height: 70px; animation-delay: 2.8s; }
+      @keyframes rippleExpand { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(2.4); opacity: 0; } }
+      .bubbles { position: absolute; inset: 0; }
+      .bubble {
+        position: absolute; bottom: -30px; border-radius: 50%;
+        background: color-mix(in srgb, var(--accent-soft) 25%, transparent);
+        border: 1px solid color-mix(in srgb, var(--accent-light) 40%, transparent);
+        animation: bubbleRise linear infinite;
+      }
+      @keyframes bubbleRise { 0% { transform: translateY(0) scale(1); opacity: 0.5; } 100% { transform: translateY(-110vh) scale(0.3); opacity: 0; } }
+      .sun-rays {
+        position: absolute; top: -10%; left: 50%; transform: translateX(-50%);
+        width: 120vw; height: 45vh; opacity: 0.15;
+        background: conic-gradient(from 90deg at 50% 0%, transparent 0deg, color-mix(in srgb, var(--accent-soft) 40%, transparent) 12deg, transparent 24deg, color-mix(in srgb, var(--accent-soft) 30%, transparent) 40deg, transparent 56deg, color-mix(in srgb, var(--accent-soft) 40%, transparent) 72deg, transparent 88deg);
+        filter: blur(40px);
+      }
+
+      /* ============================================================
+         LAYOUT
+         ============================================================ */
+      .app { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+      .app-header { padding: 16px 16px 0; }
+      .app-header__inner {
+        max-width: 1080px; margin: 0 auto;
+        display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; }
+      .brand__logo { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; background: rgba(255,255,255,0.1); backdrop-filter: blur(8px); font-size: 22px; }
+      .brand__title { font-family: var(--font-display); font-weight: 700; font-size: 17px; color: var(--white); text-shadow: 0 2px 12px rgba(0,0,0,0.3); line-height: 1.1; }
+      .brand__sub { font-size: 11px; font-weight: 600; color: var(--accent-soft); }
+
+      .emergence-badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 6px 14px; border-radius: 999px;
+        background: rgba(255,255,255,0.08); backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.15);
+        font-size: 11px; font-weight: 700; color: var(--white); letter-spacing: 0.03em;
+      }
+      .emergence-badge__logo { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #2ec4b6; color: #2ec4b6; font-size: 11px; }
+
+      .icon-btn {
+        display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px;
+        background: rgba(255,255,255,0.1); backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.12); color: var(--white);
+        cursor: pointer; transition: all 0.3s ease; border: none;
+      }
+      .icon-btn:hover { background: rgba(255,255,255,0.2); }
+      .icon-btn:hover svg { transform: rotate(60deg); }
+      .icon-btn svg { width: 20px; height: 20px; transition: transform 0.3s ease; }
+
+      .stepper { display: flex; align-items: center; gap: 4px; }
+      .stepper__item { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; transition: all 0.3s ease; }
+      .stepper__item--active { background: var(--accent); color: var(--white); box-shadow: var(--shadow-glow); }
+      .stepper__item--done { background: rgba(255,255,255,0.15); color: var(--accent-soft); }
+      .stepper__item--todo { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.4); }
+      .stepper__dot { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 10px; }
+      .stepper__item--active .stepper__dot { background: var(--white); color: var(--accent-dark); }
+      .stepper__item--done .stepper__dot { background: var(--accent); color: var(--white); }
+      .stepper__item--todo .stepper__dot { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); }
+      .stepper__sep { color: rgba(255,255,255,0.25); font-size: 12px; }
+      .stepper__item[tabindex="0"] { cursor: pointer; }
+      .stepper__item[tabindex="0"]:hover { filter: brightness(1.15); }
+
+      .app-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+      .stage { width: 100%; max-width: 880px; }
+
+      /* ============================================================
+         CARTES
+         ============================================================ */
+      .card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 28px 24px; transition: box-shadow 0.6s ease; }
+      @media (min-width: 640px) { .card { padding: 40px 36px; } }
+      .card--center { text-align: center; }
+
+      .kicker {
+        display: inline-flex; align-items: center; gap: 8px;
+        font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+        color: var(--accent-dark); background: var(--badge-bg);
+        padding: 6px 12px; border-radius: 999px; margin-bottom: 12px; transition: all 0.4s ease;
+      }
+      .kicker::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+      .card__title { font-family: var(--font-display); font-weight: 700; font-size: 24px; color: var(--night); line-height: 1.2; margin-bottom: 8px; }
+      @media (min-width: 640px) { .card__title { font-size: 30px; } }
+      .card__subtitle { font-size: 14px; font-weight: 500; color: var(--ink-soft); margin-bottom: 24px; line-height: 1.55; }
+
+      /* ============================================================
+         PANNEAUX / TRANSITIONS
+         ============================================================ */
+      .panel { display: none; }
+      .panel--active { display: block; animation: slideInRight 0.5s ease-out both; }
+      .panel--leaving { display: block; animation: slideOutLeft 0.3s ease-in both; }
+      @keyframes slideInRight { 0% { opacity: 0; transform: translateX(30px); } 100% { opacity: 1; transform: translateX(0); } }
+      @keyframes slideOutLeft { 0% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(-30px); } }
+      @keyframes fadeIn { 0% { opacity: 0; transform: translateY(14px); } 100% { opacity: 1; transform: translateY(0); } }
+      @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+      @keyframes swimGentle { 0%,100% { transform: translate(-50%,-50%) rotate(-3deg); } 50% { transform: translate(-50%,-58%) rotate(3deg); } }
+      @keyframes pulseCoral { 0%,100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--cta) 50%, transparent); } 50% { transform: scale(1.03); box-shadow: 0 0 0 14px color-mix(in srgb, var(--cta) 0%, transparent); } }
+      @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+      @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 currentColor; } 100% { box-shadow: 0 0 0 10px transparent; } }
+      @keyframes shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
+      .is-shaking { animation: shake 0.4s ease; }
+
+      /* ============================================================
+         ÉCRAN 1 — HÉRO
+         ============================================================ */
+      .hero { position: relative; min-height: 78vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; }
+      .hero__badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 999px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); font-size: 12px; font-weight: 700; color: var(--accent-soft); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 24px; animation: fadeIn 0.6s ease-out both; }
+      .hero__title { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 5.5vw, 48px); color: var(--white); text-shadow: 0 4px 30px rgba(0,0,0,0.4); line-height: 1.05; margin-bottom: 12px; max-width: 820px; animation: fadeIn 0.8s ease-out 0.2s both; }
+      .hero__sub { font-size: clamp(13px, 2.3vw, 16px); font-weight: 500; color: rgba(255,255,255,0.8); max-width: 600px; margin-bottom: 28px; line-height: 1.55; animation: fadeIn 0.8s ease-out 0.4s both; }
+      .hero__turtle { animation: float 4s ease-in-out infinite, fadeIn 1s ease-out 0.3s both; margin-bottom: 24px; }
+
+      .scene-visual { position: relative; width: 100%; max-width: 520px; margin: 0 auto 16px; aspect-ratio: 16 / 9; border-radius: var(--radius-sm); overflow: hidden; border: 2px solid var(--tint); box-shadow: var(--shadow-theme); transition: box-shadow 0.6s ease; }
+      .scene-visual svg { width: 100%; height: 100%; display: block; }
+      .scene__caption { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 18px; }
+
+      /* ============================================================
+         BOUTONS
+         ============================================================ */
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; border-radius: var(--radius-sm); padding: 14px 26px; font-family: var(--font-display); font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.22s ease; text-decoration: none; }
+      .btn:disabled { cursor: not-allowed; opacity: 0.4; }
+      .btn--cta { background: var(--cta); color: var(--white); box-shadow: var(--shadow-cta); }
+      .btn--cta:hover:not(:disabled) { background: var(--cta-dark); transform: scale(1.03); }
+      .btn--cta:active:not(:disabled) { transform: scale(0.97); }
+      .btn--cta--pulse { animation: pulseCoral 2.2s ease-in-out infinite; }
+      .btn--ghost { background: transparent; color: var(--ink-soft); padding: 14px 16px; }
+      .btn--ghost:hover { background: var(--tint); color: var(--night); }
+      .btn--lg { padding: 18px 36px; font-size: 18px; border-radius: 20px; }
+      .btn--block { width: 100%; }
+      .btn .arrow { transition: transform 0.2s ease; }
+      .btn:hover:not(:disabled) .arrow { transform: translateX(4px); }
+      .btn.is-locked { opacity: 0.45; box-shadow: none; }
+      .btn.is-locked:hover { transform: none; background: var(--cta); }
+      .actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; }
+      .step-hint { min-height: 20px; margin-top: 14px; font-size: 13px; font-weight: 700; color: #c0392b; text-align: center; opacity: 0; transition: opacity 0.2s ease; }
+      .step-hint.is-visible { opacity: 1; }
+
+      /* ============================================================
+         CHAMPS
+         ============================================================ */
+      .field { margin-bottom: 20px; }
+      .field__label { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--night); margin-bottom: 8px; }
+      .field__input { width: 100%; border: 2px solid var(--tint); background: rgba(224,244,247,0.4); border-radius: var(--radius-sm); padding: 14px 18px; font-family: var(--font-body); font-size: 17px; font-weight: 600; color: var(--night); outline: none; transition: all 0.2s ease; }
+      .field__input::placeholder { color: var(--ink-faint); font-weight: 500; }
+      .field__input:focus { border-color: var(--accent); background: var(--white); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent); }
+      .field__hint { font-size: 12px; font-weight: 600; color: var(--ink-faint); margin-top: 6px; padding: 0 8px; display: flex; justify-content: space-between; }
+      .field__valid { font-size: 11px; font-weight: 800; color: var(--accent-dark); opacity: 0; transition: opacity 0.2s; }
+      .field__valid.is-visible { opacity: 1; }
+      .suggest-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+      .suggest-btn { padding: 6px 14px; border-radius: 999px; border: 2px solid var(--tint); background: rgba(224,244,247,0.3); font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; transition: all 0.2s; }
+      .suggest-btn:hover { border-color: var(--accent); color: var(--accent-dark); background: var(--badge-bg); }
+
+      /* ============================================================
+         SÉLECTION GENRE
+         ============================================================ */
+      .gender-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 500px; margin: 0 auto; }
+      .gender-card { position: relative; display: flex; align-items: center; gap: 14px; padding: 20px; border: 2px solid var(--tint); border-radius: var(--radius-sm); background: rgba(224,244,247,0.3); cursor: pointer; transition: all 0.25s ease; font-family: var(--font-body); text-align: left; border: none; }
+      .gender-card:hover { border-color: var(--accent-light); background: rgba(224,244,247,0.6); transform: translateY(-2px); }
+      .gender-card.is-selected { border-color: var(--accent); background: var(--accent); color: var(--white); box-shadow: var(--shadow-glow); transform: scale(1.02); }
+      .gender-card__icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; font-size: 26px; font-weight: 700; flex-shrink: 0; transition: all 0.25s; }
+      .gender-card[data-gender="male"] .gender-card__icon { background: rgba(10,60,89,0.12); color: #0a3c59; }
+      .gender-card[data-gender="female"] .gender-card__icon { background: rgba(255,159,28,0.15); color: #b84a18; }
+      .gender-card.is-selected .gender-card__icon { background: rgba(255,255,255,0.2); color: var(--white); }
+      .gender-card__label { font-family: var(--font-display); font-size: 18px; font-weight: 700; line-height: 1; }
+      .gender-card__sub { font-size: 11px; font-weight: 600; opacity: 0.7; margin-top: 4px; }
+      .gender-card__check { position: absolute; top: -8px; right: -8px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--white); color: var(--accent-dark); font-size: 14px; font-weight: 900; box-shadow: 0 2px 8px rgba(0,0,0,0.2); opacity: 0; transform: scale(0); transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+      .gender-card.is-selected .gender-card__check { opacity: 1; transform: scale(1); }
+
+      /* ============================================================
+         PRÉVISUALISATION TORTUE
+         ============================================================ */
+      .preview { display: flex; flex-direction: column; align-items: center; }
+      .preview__frame { position: relative; width: 200px; height: 200px; border-radius: 50%; overflow: hidden; background: linear-gradient(180deg, var(--accent-soft) 0%, var(--tint) 50%, color-mix(in srgb, var(--accent-light) 60%, transparent) 100%); border: 4px solid var(--white); box-shadow: var(--shadow-theme); animation: float 4s ease-in-out infinite; transition: all 0.6s ease; }
+      .preview__svg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: swimGentle 5s ease-in-out infinite; }
+      .preview__badge { margin-top: 14px; max-width: 260px; padding: 8px 14px; border-radius: 14px; background: var(--ocean-deep); color: var(--white); font-size: 11px; font-weight: 700; text-align: center; line-height: 1.3; transition: background 0.6s ease; }
+
+      /* ============================================================
+         BANDEAU SCIENCE
+         ============================================================ */
+      .science-band { margin-top: 18px; padding: 16px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 8%, var(--white)); border-left: 4px solid var(--accent); display: flex; gap: 14px; align-items: flex-start; text-align: left; transition: all 0.4s ease; }
+      .science-band__icon { flex-shrink: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: var(--white); font-size: 20px; }
+      .science-band__text { font-size: 13px; font-weight: 600; color: var(--night); line-height: 1.5; }
+      .science-band__text strong { color: var(--accent-dark); font-weight: 800; }
+
+      /* ============================================================
+         CARTE MÉDITERRANÉE (Leaflet)
+         ============================================================ */
+      .map-wrapper { display: grid; gap: 16px; }
+      @media (min-width: 768px) { .map-wrapper { grid-template-columns: 210px 1fr; } }
+
+      .map-filters { display: flex; flex-direction: column; gap: 8px; }
+      .filter-btn { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radius-xs); border: 2px solid var(--tint); background: var(--white); cursor: pointer; transition: all 0.22s ease; font-family: var(--font-body); font-size: 12px; font-weight: 700; color: var(--ink-soft); text-align: left; width: 100%; }
+      .filter-btn:hover { border-color: var(--accent-light); }
+      .filter-btn.is-active { border-color: var(--accent); background: var(--badge-bg); color: var(--accent-dark); }
+      .filter-btn__dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+      .filter-btn__count { margin-left: auto; font-size: 10px; font-weight: 800; color: var(--ink-faint); background: var(--tint); padding: 2px 8px; border-radius: 999px; }
+
+      .map-container { position: relative; width: 100%; aspect-ratio: 16 / 11; min-height: 320px; border-radius: var(--radius-sm); overflow: hidden; border: 2px solid var(--tint); box-shadow: var(--shadow-theme); background: linear-gradient(160deg, #a8d8e8 0%, #7ec8d8 40%, #5ab0c8 100%); transition: box-shadow 0.6s ease; isolation: isolate; }
+      #leaflet-map { position: absolute; inset: 0; background: #a8d8e8; font-family: var(--font-body); }
+      .leaflet-container { font-family: var(--font-body); }
+      .map-hint { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 650; padding: 7px 14px; border-radius: 999px; background: rgba(10,60,89,0.78); color: var(--white); font-size: 11px; font-weight: 700; white-space: nowrap; pointer-events: none; transition: opacity 0.6s ease; }
+      .map-hint.is-hidden { opacity: 0; }
+      .map-fallback { position: absolute; inset: 0; z-index: 700; padding: 14px; overflow: auto; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; background: #eaf6f9; }
+      .map-fallback p { width: 100%; font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 4px; }
+
+      /* Marqueurs (pastilles de couleur) */
+      .lf-pin { display: grid; place-items: center; cursor: pointer; }
+      .lf-pin:hover .map-pin__dot { transform: scale(1.25); }
+      .map-pin__dot { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--white); box-shadow: 0 2px 8px rgba(0,0,0,0.3); animation: pinPulse 2.5s ease-in-out infinite; transition: transform 0.2s ease; }
+      .map-pin--nesting .map-pin__dot { background: #ff9f1c; }
+      .map-pin--nesting-cool .map-pin__dot { background: #2ec4b6; }
+      .map-pin--feeding .map-pin__dot { background: #2ec4b6; }
+      .map-pin--observation .map-pin__dot { background: #4a8ac4; }
+      .map-pin--danger .map-pin__dot { background: #e74c3c; }
+      .map-pin--toulon .map-pin__dot { background: #9b59b6; width: 20px; height: 20px; }
+      @keyframes pinPulse { 0%,100% { box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 0 0 currentColor; } 50% { box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 0 6px transparent; } }
+      .map-pin--selected .map-pin__dot { width: 22px; height: 22px; border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent), 0 2px 12px rgba(0,0,0,0.3); animation: none; }
+      .map-pin--selected::after { content: "✓"; position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--white); font-size: 10px; font-weight: 900; display: grid; place-items: center; animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
+      .leaflet-tooltip.pin-tip { background: var(--white); color: var(--night); border: none; border-radius: 10px; padding: 6px 12px; font-family: var(--font-body); font-size: 11px; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+
+      .map-legend { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; font-size: 11px; font-weight: 700; color: var(--ink-soft); }
+      .map-legend__item { display: flex; align-items: center; gap: 5px; }
+      .map-legend__dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--white); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+      /* Fiche info marker */
+      .marker-info { margin-top: 16px; border: 2px solid var(--card-border); border-radius: var(--radius-sm); background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 6%, transparent) 0%, rgba(224,244,247,0.5) 100%); padding: 18px; display: none; animation: fadeIn 0.4s ease-out both; transition: all 0.4s ease; }
+      .marker-info.is-visible { display: block; }
+      .marker-info__head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+      .marker-info__dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--white); box-shadow: 0 1px 4px rgba(0,0,0,0.15); flex-shrink: 0; }
+      .marker-info__title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--night); }
+      .marker-info__coords { font-size: 11px; font-weight: 600; color: var(--ink-faint); font-variant-numeric: tabular-nums; margin-bottom: 10px; }
+      .marker-info__desc { font-size: 13px; font-weight: 500; color: rgba(10,60,89,0.8); line-height: 1.55; margin-bottom: 12px; }
+      .marker-info__stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+      .stat-pill { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--white); color: var(--night); }
+      .stat-pill strong { color: var(--accent-dark); font-weight: 800; }
+      .stat-pill--temp { background: var(--white); }
+      .stat-pill--temp.hot { border: 2px solid #ff9f1c; }
+      .stat-pill--temp.hot strong { color: #e8881a; }
+      .stat-pill--temp.cool { border: 2px solid #2ec4b6; }
+      .stat-pill--temp.cool strong { color: #25a99c; }
+      .marker-info__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+      .marker-info__tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: var(--badge-bg); font-size: 10px; font-weight: 700; color: var(--accent-dark); }
+      .marker-info__tag--hot { background: rgba(255,159,28,0.14); color: #e8881a; }
+      .marker-info__tag--cool { background: rgba(46,196,182,0.14); color: #25a99c; }
+      .marker-info__tag--danger { background: rgba(231,76,60,0.12); color: #c0392b; }
+      .marker-info__select-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: var(--radius-sm); border: none; background: var(--cta); color: var(--white); font-family: var(--font-display); font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; }
+      .marker-info__select-btn:hover:not(:disabled) { background: var(--cta-dark); transform: scale(1.03); }
+      .marker-info__select-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .marker-info__select-btn.is-selected { background: var(--accent); }
+
+      /* ============================================================
+         RÉCAPITULATIF (Étape 4)
+         ============================================================ */
+      .recap-grid { display: grid; gap: 14px; max-width: 540px; margin: 0 auto 24px; }
+      .recap-row { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--radius-sm); background: var(--tint); transition: background 0.6s ease; }
+      .recap-row__icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--white); font-size: 22px; flex-shrink: 0; box-shadow: var(--shadow-theme); }
+      .recap-row__label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); }
+      .recap-row__value { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--night); }
+      .recap-row__temp { font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 999px; margin-top: 4px; display: inline-block; }
+      .recap-row__temp--hot { background: rgba(255,159,28,0.15); color: #e8881a; }
+      .recap-row__temp--cool { background: rgba(46,196,182,0.15); color: #25a99c; }
+      .recap-preview { display: flex; justify-content: center; margin-bottom: 24px; }
+
+      /* ============================================================
+         MODALE
+         ============================================================ */
+      .modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(10,60,89,0.6); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; padding: 20px; }
+      .modal-overlay.is-open { display: flex; animation: fadeIn 0.3s ease-out; }
+      .modal { background: var(--white); border-radius: var(--radius); max-width: 480px; width: 100%; box-shadow: var(--shadow-lg); padding: 28px; position: relative; animation: popIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both; }
+      .modal__close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--tint); color: var(--ink-soft); cursor: pointer; font-size: 18px; font-weight: 700; transition: all 0.2s; }
+      .modal__close:hover { background: var(--accent); color: var(--white); }
+      .modal__icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: var(--badge-bg); color: var(--accent-dark); font-size: 24px; margin-bottom: 14px; }
+      .modal__title { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--night); margin-bottom: 10px; }
+      .modal__body { font-size: 14px; font-weight: 500; color: var(--ink-soft); line-height: 1.6; }
+      .modal__body p { margin-bottom: 10px; }
+      .modal__body strong { color: var(--accent-dark); font-weight: 800; }
+      .modal__source { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--tint); font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+
+      .app-footer { padding: 12px 16px 20px; text-align: center; }
+      .app-footer p { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.4); }
+
+      /* ============================================================
+         RESPONSIVE
+         ============================================================ */
+      @media (max-width: 640px) {
+        .stepper { display: none; }
+        .actions { flex-direction: column-reverse; gap: 10px; }
+        .actions .btn { width: 100%; }
+        .map-wrapper { grid-template-columns: 1fr; }
+        .map-filters { flex-direction: row; overflow-x: auto; padding-bottom: 6px; }
+        .filter-btn { white-space: nowrap; min-width: 170px; }
+        .map-container { aspect-ratio: 4 / 5; }
+        .gender-grid { gap: 10px; }
+        .gender-card { padding: 14px; }
+      }
+      @media (min-width: 641px) {
+        .custom-grid { display: grid; grid-template-columns: 1fr 220px; gap: 28px; align-items: start; }
+      }
+    </style>
+
+    <!-- Charger Phaser JS -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <!-- Leaflet (carte) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  </head>
+  <body>
+    <!-- Container principal pour le jeu Phaser -->
+    <div id="game-container"></div>
+
+    <!-- ============ FOND OCÉAN ============ -->
+    <div class="ocean-bg" aria-hidden="true">
+      <div class="sun-rays"></div>
+      <div class="caustics"></div>
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+      <div class="ripple ripple-1"></div>
+      <div class="ripple ripple-2"></div>
+      <div class="ripple ripple-3"></div>
+      <div class="bubbles" id="bubbles"></div>
+    </div>
+
+    <div class="app">
+      <!-- ============ EN-TÊTE ============ -->
+      <header class="app-header">
+        <div class="app-header__inner">
+          <div class="brand">
+            <span class="brand__logo">🐢</span>
+            <div>
+              <div class="brand__title">L'Aventure des Tortues</div>
+              <div class="brand__sub">Ocean Hackathon Toulon</div>
+            </div>
+          </div>
+          <nav class="stepper" id="stepper" aria-label="Progression">
+            <div class="stepper__item stepper__item--active" data-step="0"><span class="stepper__dot">1</span><span>Accueil</span></div>
+            <span class="stepper__sep">›</span>
+            <div class="stepper__item stepper__item--todo" data-step="1"><span class="stepper__dot">2</span><span>Tortue</span></div>
+            <span class="stepper__sep">›</span>
+            <div class="stepper__item stepper__item--todo" data-step="2"><span class="stepper__dot">3</span><span>Carte</span></div>
+            <span class="stepper__sep">›</span>
+            <div class="stepper__item stepper__item--todo" data-step="3"><span class="stepper__dot">4</span><span>Lancement</span></div>
+          </nav>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="emergence-badge"><span class="emergence-badge__logo">🐢</span>ÉMERGENCE</span>
+            <button class="icon-btn" id="btn-settings" title="Paramètres" aria-label="Paramètres">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- ============ CONTENU ============ -->
+      <main class="app-main">
+        <div class="stage" id="stage">
+
+          <!-- ====== ÉTAPE 1 — ACCUEIL & CONTEXTE TOULON ====== -->
+          <section class="panel panel--active" id="screen-story" data-step="0">
+            <div class="hero">
+              <span class="hero__badge">Ocean Hackathon Toulon × Association Émergence</span>
+              <div class="hero__turtle" id="hero-turtle"></div>
+              <h1 class="hero__title">L'Aventure des Tortues de Méditerranée</h1>
+              <p class="hero__sub">
+                Le climat change et les températures de surface augmentent. En Méditerranée, notamment sur le littoral du Var et autour de Toulon, de nouvelles pontes exceptionnelles sont observées. Explore l'impact de la température du sable sur le sexe et la survie des tortues marines.
+              </p>
+
+              <div class="scene-visual" style="max-width:500px;">
+                <svg viewBox="0 0 500 280">
+                  <defs><linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f4e4c8"/><stop offset="100%" stop-color="#e8d0a8"/></linearGradient></defs>
+                  <rect width="500" height="180" fill="url(#skyG)"/>
+                  <rect y="180" width="500" height="100" fill="#7ec8d8"/>
+                  <path d="M0,180 Q250,165 500,180 L500,190 L0,190 Z" fill="#c8b898"/>
+                  <circle cx="400" cy="55" r="30" fill="#fff8e0" opacity="0.85"/>
+                  <rect x="135" y="125" width="100" height="34" rx="4" fill="#ff9f1c" opacity="0.85"/>
+                  <text x="185" y="147" text-anchor="middle" fill="#fff" font-family="Fredoka" font-size="11" font-weight="700">NID BALISÉ</text>
+                  <g><circle cx="110" cy="165" r="9" fill="#2ec4b6"/><rect x="105" y="148" width="10" height="18" fill="#2ec4b6"/></g>
+                  <g><circle cx="210" cy="165" r="9" fill="#2ec4b6"/><rect x="205" y="148" width="10" height="18" fill="#2ec4b6"/></g>
+                  <g><circle cx="285" cy="165" r="9" fill="#2ec4b6"/><rect x="280" y="148" width="10" height="18" fill="#2ec4b6"/></g>
+                  <g><circle cx="360" cy="165" r="9" fill="#2ec4b6"/><rect x="355" y="148" width="10" height="18" fill="#2ec4b6"/></g>
+                  <text x="55" y="45" fill="#0a3c59" font-family="Fredoka" font-size="12" font-weight="600">👮 Police Municipale</text>
+                  <text x="310" y="45" fill="#2ec4b6" font-family="Fredoka" font-size="12" font-weight="600">💚 Bénévoles Émergence</text>
+                  <text x="250" y="235" text-anchor="middle" fill="#fff" font-family="Fredoka" font-size="14" font-weight="600">🌊 Littoral du Var — Toulon</text>
+                </svg>
+              </div>
+              <p class="scene__caption">Balisage de protection d'un nid par la Police Municipale et l'Association Émergence (t-shirt vert)</p>
+
+              <div class="science-band" style="max-width:580px;text-align:left;">
+                <div class="science-band__icon">🌡️</div>
+                <div class="science-band__text">
+                  <strong>Le savais-tu ?</strong> La température du sable détermine le sexe des tortues (TSD). Au-dessus de <strong>29.5°C</strong>, naissent des <strong>femelles</strong> ; en dessous de <strong>28.5°C</strong>, des <strong>mâles</strong>. La hausse des températures crée une <strong>pénurie critique de mâles</strong> en Méditerranée.
+                </div>
+              </div>
+
+              <div class="actions" style="justify-content:center;margin-top:24px;">
+                <button class="btn btn--cta btn--lg btn--cta--pulse" id="btn-step1-next">Commencer l'Aventure <span class="arrow">→</span></button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====== ÉTAPE 2 — PERSONNALISATION ====== -->
+          <section class="panel" id="screen-customize" data-step="1" hidden>
+            <div class="card">
+              <span class="kicker">Création du personnage</span>
+              <h2 class="card__title">Personnalise ta tortue marine 🐢</h2>
+              <p class="card__subtitle">Donne un prénom à ton individu et choisis son sexe. Le thème visuel du jeu s'adaptera automatiquement.</p>
+              <div class="custom-grid">
+                <div>
+                  <div class="field">
+                    <label class="field__label" for="turtle-name">✎ Donne un prénom à ta tortue</label>
+                    <input type="text" id="turtle-name" class="field__input" placeholder="Ex: Caretta, Lucky, Hope, CC39..." maxlength="24" autocomplete="off" spellcheck="false" />
+                    <div class="field__hint">
+                      <span id="name-count">0/24 caractères</span>
+                      <span class="field__valid" id="name-valid">✓ Prénom valide</span>
+                    </div>
+                  </div>
+                  <div class="suggest-row">
+                    <button class="suggest-btn" data-suggest="Caretta">Caretta</button>
+                    <button class="suggest-btn" data-suggest="Lucky">Lucky</button>
+                    <button class="suggest-btn" data-suggest="Hope">Hope</button>
+                    <button class="suggest-btn" data-suggest="CC39">CC39</button>
+                    <button class="suggest-btn" data-suggest="Calypso">Calypso</button>
+                  </div>
+                  <div class="field" style="margin-bottom:0;">
+                    <label class="field__label">⚥ Sélectionne le sexe</label>
+                    <div class="gender-grid">
+                      <button type="button" class="gender-card" data-gender="male" aria-pressed="false">
+                        <span class="gender-card__icon">♂</span>
+                        <div><div class="gender-card__label">Mâle</div><div class="gender-card__sub">Couleurs froides</div></div>
+                        <span class="gender-card__check">✓</span>
+                      </button>
+                      <button type="button" class="gender-card" data-gender="female" aria-pressed="false">
+                        <span class="gender-card__icon">♀</span>
+                        <div><div class="gender-card__label">Femelle</div><div class="gender-card__sub">Couleurs chaudes</div></div>
+                        <span class="gender-card__check">✓</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="preview">
+                  <div class="preview__frame"><div class="preview__svg" id="preview-turtle"></div></div>
+                  <div class="preview__badge" id="preview-badge">En attente de personnalisation...</div>
+                </div>
+              </div>
+              <div class="step-hint" id="step2-hint" role="status" aria-live="polite"></div>
+              <div class="actions">
+                <button class="btn btn--ghost" data-goto="0">← Retour</button>
+                <button class="btn btn--cta is-locked" id="btn-step2-next" aria-disabled="true">Explorer la Carte de Méditerranée <span class="arrow">→</span></button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====== ÉTAPE 3 — CARTE DE MÉDITERRANÉE ====== -->
+          <section class="panel" id="screen-map" data-step="2" hidden>
+            <div class="card">
+              <span class="kicker">Exploration des zones</span>
+              <h2 class="card__title">Carte de Méditerranée 🗺️</h2>
+              <p class="card__subtitle">Déplace la carte avec ta souris (ou ton doigt), zoome avec la molette, puis clique sur les marqueurs pour découvrir les données scientifiques de chaque zone.</p>
+
+              <div class="map-legend">
+                <div class="map-legend__item"><span class="map-legend__dot" style="background:#ff9f1c;"></span>Ponte (sable chaud ♀)</div>
+                <div class="map-legend__item"><span class="map-legend__dot" style="background:#2ec4b6;"></span>Ponte (sable frais ♂) / nourrissage</div>
+                <div class="map-legend__item"><span class="map-legend__dot" style="background:#9b59b6;"></span>Toulon / Var</div>
+                <div class="map-legend__item"><span class="map-legend__dot" style="background:#4a8ac4;"></span>Observation</div>
+                <div class="map-legend__item"><span class="map-legend__dot" style="background:#e74c3c;"></span>Danger</div>
+              </div>
+
+              <div class="map-wrapper">
+                <div class="map-filters" id="map-filters">
+                  <button class="filter-btn is-active" data-layer="all"><span class="filter-btn__dot" style="background:linear-gradient(135deg,#ff9f1c,#2ec4b6,#9b59b6,#4a8ac4,#e74c3c);"></span>Tous les calques<span class="filter-btn__count" id="count-all">0</span></button>
+                  <button class="filter-btn" data-layer="nesting"><span class="filter-btn__dot" style="background:#ff9f1c;"></span>Zones de ponte<span class="filter-btn__count" id="count-nesting">0</span></button>
+                  <button class="filter-btn" data-layer="feeding"><span class="filter-btn__dot" style="background:#2ec4b6;"></span>Nourrissage & méduses<span class="filter-btn__count" id="count-feeding">0</span></button>
+                  <button class="filter-btn" data-layer="observation"><span class="filter-btn__dot" style="background:#4a8ac4;"></span>Observation écoresponsable<span class="filter-btn__count" id="count-observation">0</span></button>
+                  <button class="filter-btn" data-layer="danger"><span class="filter-btn__dot" style="background:#e74c3c;"></span>Dangers humains<span class="filter-btn__count" id="count-danger">0</span></button>
+                </div>
+
+                <div class="map-container" id="map-container">
+                  <div id="leaflet-map" role="application" aria-label="Carte interactive de la Méditerranée"></div>
+                  <div class="map-hint" id="map-hint">🖱️ Glisse pour te déplacer · molette ou +/− pour zoomer</div>
+                </div>
+              </div>
+
+              <div class="marker-info" id="marker-info">
+                <div class="marker-info__head">
+                  <span class="marker-info__dot" id="mi-dot"></span>
+                  <div><div class="marker-info__title" id="mi-title"></div><div class="marker-info__coords" id="mi-coords"></div></div>
+                </div>
+                <p class="marker-info__desc" id="mi-desc"></p>
+                <div class="marker-info__stats" id="mi-stats"></div>
+                <div class="marker-info__tags" id="mi-tags"></div>
+                <button class="marker-info__select-btn" id="mi-select">📍 Zone en cours de consultation</button>
+              </div>
+
+              <div class="science-band">
+                <div class="science-band__icon">ℹ️</div>
+                <div class="science-band__text">
+                  <strong>Données réelles 2024-2025</strong> — Réseau d'émergence & CRFS Émergence. Les zones <strong style="color:#e8881a;">orange</strong> ont un sable chaud (>29.5°C, produisant des femelles) ; les zones <strong style="color:#25a99c;">turquoise</strong> ont un sable frais (&lt;28.5°C, produisant des mâles).<br>
+                  Les zones de Méditerranée centrale et orientale ajoutées sur la carte sont données à titre d'information générale, à compléter avec vos sources scientifiques.
+                </div>
+              </div>
+
+              <div class="actions">
+                <button class="btn btn--ghost" data-goto="1">← Retour</button>
+                <button class="btn btn--cta" id="btn-step3-next">Valider et continuer <span class="arrow">→</span></button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====== ÉTAPE 4 — RÉSUMÉ & LANCEMENT ====== -->
+          <section class="panel" id="screen-launch" data-step="3" hidden>
+            <div class="card card--center">
+              <span class="kicker">Prêt à plonger</span>
+              <h2 class="card__title">Récapitulatif de ta tortue</h2>
+              <p class="card__subtitle">Vérifie les informations avant de te lancer dans l'aventure.</p>
+              <div class="recap-preview">
+                <div class="preview__frame" style="width:200px;height:200px;"><div class="preview__svg" id="launch-turtle"></div></div>
+              </div>
+              <div class="recap-grid">
+                <div class="recap-row">
+                  <div class="recap-row__icon">🐢</div>
+                  <div><div class="recap-row__label">Prénom</div><div class="recap-row__value" id="recap-name">—</div></div>
+                </div>
+                <div class="recap-row">
+                  <div class="recap-row__icon" id="recap-gender-icon">♂</div>
+                  <div><div class="recap-row__label">Genre</div><div class="recap-row__value" id="recap-gender">—</div></div>
+                </div>
+                <div class="recap-row">
+                  <div class="recap-row__icon">📍</div>
+                  <div><div class="recap-row__label">Lieu de départ</div><div class="recap-row__value" id="recap-origin">—</div></div>
+                </div>
+                <div class="recap-row">
+                  <div class="recap-row__icon">🌡️</div>
+                  <div>
+                    <div class="recap-row__label">Température du nid</div>
+                    <div class="recap-row__value" id="recap-temp">—</div>
+                    <span class="recap-row__temp" id="recap-temp-badge"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="actions" style="justify-content:center;">
+                <button class="btn btn--ghost" data-goto="2">← Retour</button>
+                <button class="btn btn--cta btn--lg btn--cta--pulse" id="btn-launch">ENTRER DANS L'OCÉAN 🌊 <span class="arrow">→</span></button>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+
+      <footer class="app-footer"><p>Ocean Hackathon Toulon × Association Émergence — Protégeons les tortues de Méditerranée 🌊🐢</p></footer>
+    </div>
+
+    <!-- ============ MODALE ============ -->
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal">
+        <button class="modal__close" id="modal-close">✕</button>
+        <div class="modal__icon" id="modal-icon">ℹ️</div>
+        <h3 class="modal__title" id="modal-title"></h3>
+        <div class="modal__body" id="modal-body"></div>
+        <div class="modal__source" id="modal-source"></div>
+      </div>
+    </div>
+
+    <!-- Script Module Principal de l'Application -->
+    <script type="module" src="/src/main.js"></script>
+
+    <script>
+      /* ============================================================
+         DONNÉES — MARKERS DE LA CARTE
+         (lat / lon = vraies coordonnées, utilisées par la carte Leaflet)
+         ============================================================ */
+      var MARKERS = [
+        { 
+  id: "toulon", 
+  type: "nesting", 
+  subtype: "toulon", 
+  name: "Toulon / Plages du Var", 
+  region: "Var, France 🇫🇷", 
+  lat: 43.116, 
+  lon: 5.933,
+  x: 42, 
+  y: 36, 
+  color: "#9b59b6", 
+  sandTemp: 30.2,
+  desc: "Zone pionnière de ponte inédite ! Pour la première fois, plus d'une centaine d'œufs de tortue caouanne ont été pondus sur le littoral varois, un phénomène directement lié à l'augmentation de la température de surface de la mer. Toulon est le cœur du projet Ocean Hackathon, avec un suivi rigoureux par le réseau Émergence.",
+  stats: [
+    { label: "œufs enregistrés", value: "100+" },
+    { label: "temp. sable", value: "30.2°C" },
+    { label: "suivi", value: "actif" }
+  ],
+  tags: [
+    { text: "Ponte historique 100+ œufs", cls: "hot" },
+    { text: "Sable chaud >29.5°C", cls: "hot" },
+    { text: "Impact température mer", cls: "hot" },
+    { text: "Ocean Hackathon Toulon" },
+    { text: "Suivi CRFS Émergence" }
+  ]  } , 
+
+        { id:"sanary", type:"nesting", name:"Sanary-sur-Mer", region:"Var, France 🇫🇷", lat:43.135, lon:5.778,
+          x:36, y:40, color:"#ff9f1c", sandTemp:31.0,
+          desc:"Record historique en 2025 : 108 œufs enregistrés, 76 émergences réussies. Le sable particulièrement chaud de Sanary produit majoritairement des femelles.",
+          stats:[{label:"œufs",value:"108"},{label:"émergences",value:"76"},{label:"année",value:"2025"},{label:"temp. sable",value:"31.0°C"}],
+          tags:[{text:"Sable chaud >29.5°C",cls:"hot"},{text:"Femelles majoritaires",cls:"hot"},{text:"Sanctuaire Pelagos"},{text:"Courant liguro-provençal"}] },
+        { id:"cavalaire", type:"nesting", name:"Cavalaire-sur-Mer", region:"Var, France 🇫🇷", lat:43.175, lon:6.534,
+          x:52, y:42, color:"#ff9f1c", sandTemp:29.8,
+          desc:"57 œufs recensés à Cavalaire-sur-Mer en 2025. Zone de ponte en développement sur le littoral varois, près du golfe de Saint-Tropez.",
+          stats:[{label:"œufs",value:"57"},{label:"année",value:"2025"},{label:"temp. sable",value:"29.8°C"}],
+          tags:[{text:"Sable chaud >29.5°C",cls:"hot"},{text:"Femelles majoritaires",cls:"hot"},{text:"Golfe de Saint-Tropez"}] },
+        { id:"hyeres", type:"nesting", name:"Hyères & Presqu'île de Giens", region:"Var, France 🇫🇷", lat:43.041, lon:6.150,
+          x:48, y:36, color:"#ff9f1c", sandTemp:30.5,
+          desc:"Zone de ponte historique, incluant la célèbre plage de l'Almanarre. Site de suivi scientifique de longue date par l'Association Émergence.",
+          stats:[{label:"site",value:"historique"},{label:"plage",value:"Almanarre"},{label:"temp. sable",value:"30.5°C"}],
+          tags:[{text:"Sable chaud >29.5°C",cls:"hot"},{text:"Femelles majoritaires",cls:"hot"},{text:"Presqu'île de Giens"},{text:"Suivi historique"}] },
+        { id:"corse", type:"nesting", name:"Littoral Est de la Corse", region:"Corse, France 🇫🇷", lat:42.150, lon:9.510,
+          x:72, y:52, color:"#ff9f1c", sandTemp:29.1,
+          desc:"Secteur de ponte en forte augmentation sur les longues plages de sable de la côte orientale corse. Suivi régulier par les scientifiques.",
+          stats:[{label:"suivi",value:"actif"},{label:"temp. sable",value:"29.1°C"}],
+          tags:[{text:"Sable chaud",cls:"hot"},{text:"Réseau RTMMF"},{text:"Nouveau site"}] },
+        { id:"argeles", type:"nesting-cool", name:"Argelès-sur-Mer / Occitanie", region:"Occitanie, France 🇫🇷", lat:42.560, lon:3.047,
+          x:18, y:56, color:"#2ec4b6", sandTemp:27.8,
+          desc:"Nidification rare en 2025 : 77 œufs découverts, 76 émergences réussies. Le sable plus frais de cette côte produit majoritairement des mâles.",
+          stats:[{label:"œufs",value:"77"},{label:"émergences",value:"76"},{label:"année",value:"2025"},{label:"temp. sable",value:"27.8°C"}],
+          tags:[{text:"Sable frais <28.5°C",cls:"cool"},{text:"Mâles majoritaires",cls:"cool"},{text:"Parc marin Golfe du Lion"}] },
+        { id:"golfe-juan", type:"nesting", name:"Vallauris - Golfe-Juan", region:"Alpes-Maritimes, France 🇫🇷", lat:43.564, lon:7.072,
+          x:62, y:32, color:"#ff9f1c", sandTemp:30.0,
+          desc:"82 œufs détectés lors du nettoyage des plages à Vallauris-Golfe-Juan en 2025.",
+          stats:[{label:"œufs",value:"82"},{label:"année",value:"2025"},{label:"temp. sable",value:"30.0°C"}],
+          tags:[{text:"Sable chaud >29.5°C",cls:"hot"},{text:"Femelles majoritaires",cls:"hot"}] },
+        { id:"barcares", type:"nesting-cool", name:"Le Barcarès / Leucate", region:"Occitanie, France 🇫🇷", lat:42.830, lon:3.042,
+          x:20, y:50, color:"#2ec4b6", sandTemp:28.0,
+          desc:"87 œufs enregistrés au Barcarès/Leucate en 2025. Sable plus frais produisant des mâles.",
+          stats:[{label:"œufs",value:"87"},{label:"année",value:"2025"},{label:"temp. sable",value:"28.0°C"}],
+          tags:[{text:"Sable frais <28.5°C",cls:"cool"},{text:"Mâles majoritaires",cls:"cool"}] },
+        { id:"baleares", type:"feeding", name:"Îles Baléares", region:"Espagne 🇪🇸", lat:39.600, lon:2.600,
+          x:28, y:74, color:"#2ec4b6", sandTemp:null,
+          desc:"Zone de nourrissage majeure. Abondance de méduses dans les herbiers de posidonies.",
+          stats:[{label:"méduses",value:"abondantes"}],
+          tags:[{text:"Zone de nourrissage"},{text:"Posidonies"}] },
+        { id:"sicile", type:"nesting", name:"Côte Sud de la Sicile", region:"Italie 🇮🇹", lat:37.100, lon:14.200,
+          x:85, y:82, color:"#ff9f1c", sandTemp:31.4,
+          desc:"Site historique majeur de ponte en Méditerranée centrale. Sable particulièrement chaud produisant une immense majorité de femelles.",
+          stats:[{label:"densité",value:"élevée"},{label:"temp. sable",value:"31.4°C"}],
+          tags:[{text:"Sable chaud >29.5°C",cls:"hot"},{text:"Ponte historique"}] },
+        { id:"port-cros", type:"observation", name:"Parc National de Port-Cros", region:"Porquerolles, France 🇫🇷", lat:43.000, lon:6.400,
+          x:46, y:40, color:"#4a8ac4", sandTemp:null,
+          desc:"Aire marine protégée avec sentiers sous-marins écoresponsables.",
+          stats:[{label:"réseau",value:"éco-responsable"}],
+          tags:[{text:"Parc national"},{text:"Tourisme responsable"}] },
+        /* Coordonnées corrigées : l'ancien point (43.73 N, 4.73 E) tombait dans les terres. */
+        { id:"grau-du-roi", type:"danger", name:"Grau-du-Roi / Port-Saint-Louis", region:"Golfe du Lion, France 🇫🇷", lat:43.350, lon:4.450,
+          x:32, y:48, color:"#e74c3c", sandTemp:null,
+          desc:"Fort trafic maritime et risques de captures accidentelles dans les filets.",
+          stats:[{label:"risques",value:"élevés"}],
+          tags:[{text:"Filets de pêche",cls:"danger"},{text:"Collisions",cls:"danger"}] },
+
+        /* ---------- Nouvelles zones : Méditerranée centrale, orientale et passages ---------- */
+        { id:"zakynthos", type:"nesting", name:"Zakynthos — Baie de Laganas", region:"Îles Ioniennes, Grèce 🇬🇷", lat:37.720, lon:20.880, color:"#ff9f1c", sandTemp:null,
+          desc:"Au cœur du Parc national marin de Zakynthos, la baie de Laganas est l'un des plus importants sites de ponte de la tortue caouanne en Méditerranée. L'accès aux plages est réglementé, surtout la nuit, pour protéger les nids.",
+          stats:[{label:"espèce principale",value:"caouanne"},{label:"statut",value:"parc national marin"}],
+          tags:[{text:"Site de ponte majeur",cls:"hot"},{text:"Plages réglementées"},{text:"Suivi scientifique"}] },
+        { id:"kyparissia", type:"nesting", name:"Baie de Kyparissia", region:"Péloponnèse, Grèce 🇬🇷", lat:37.250, lon:21.620, color:"#ff9f1c", sandTemp:null,
+          desc:"Longue plage de sable de l'ouest du Péloponnèse, l'une des plus denses de Méditerranée pour la ponte des caouannes. Les nids y sont suivis chaque été, notamment par l'association grecque Archelon.",
+          stats:[{label:"espèce principale",value:"caouanne"},{label:"suivi",value:"Archelon"}],
+          tags:[{text:"Site de ponte majeur",cls:"hot"},{text:"Plage de sable continue"}] },
+        { id:"crete", type:"nesting", name:"Crète — Réthymnon & La Canée", region:"Crète, Grèce 🇬🇷", lat:35.460, lon:24.300, color:"#ff9f1c", sandTemp:null,
+          desc:"Les longues plages de la côte nord de la Crète accueillent des pontes régulières de caouannes, suivies par des associations locales. Un exemple de cohabitation entre tourisme et protection des nids.",
+          stats:[{label:"espèce principale",value:"caouanne"}],
+          tags:[{text:"Zone de ponte régulière",cls:"hot"},{text:"Tourisme balnéaire"}] },
+        { id:"iztuzu", type:"nesting", name:"Dalyan — Plage d'İztuzu", region:"Turquie 🇹🇷", lat:36.800, lon:28.620, color:"#ff9f1c", sandTemp:null,
+          desc:"Plage emblématique de la côte turque, connue pour la ponte des caouannes. Elle est fermée la nuit pendant la saison de ponte et fait partie d'une zone spécialement protégée.",
+          stats:[{label:"espèce principale",value:"caouanne"},{label:"accès",value:"limité la nuit"}],
+          tags:[{text:"Zone protégée",cls:"hot"},{text:"Observation encadrée"}] },
+        { id:"patara", type:"nesting", name:"Plage de Patara", region:"Turquie 🇹🇷", lat:36.260, lon:29.310, color:"#ff9f1c", sandTemp:null,
+          desc:"L'une des plus longues plages de Turquie, site de ponte de la tortue caouanne en bordure d'un site archéologique. L'accès et les aménagements y sont limités pour préserver les nids.",
+          stats:[{label:"espèce principale",value:"caouanne"}],
+          tags:[{text:"Plage protégée",cls:"hot"},{text:"Aménagements limités"}] },
+        { id:"belek", type:"nesting", name:"Belek (Antalya)", region:"Turquie 🇹🇷", lat:36.850, lon:31.050, color:"#ff9f1c", sandTemp:null,
+          desc:"Zone de ponte située à côté d'un fort tourisme balnéaire. Éclairage, parasols et fréquentation nocturne y sont encadrés : un cas d'école de cohabitation entre hôtels et tortues.",
+          stats:[{label:"espèce principale",value:"caouanne"}],
+          tags:[{text:"Pollution lumineuse",cls:"danger"},{text:"Zone de ponte",cls:"hot"}] },
+        { id:"cilicie", type:"nesting", name:"Côte de Cilicie (Akyatan / Kazanlı)", region:"Turquie 🇹🇷", lat:36.520, lon:35.150, color:"#ff9f1c", sandTemp:null,
+          desc:"Plages du sud-est de la Turquie, parmi les principaux sites de ponte de la tortue verte (Chelonia mydas) en Méditerranée, avec aussi des pontes de caouannes.",
+          stats:[{label:"espèces",value:"verte & caouanne"}],
+          tags:[{text:"Tortue verte",cls:"hot"},{text:"Zone de ponte"}] },
+        { id:"lara", type:"nesting", name:"Lara — Péninsule d'Akamas", region:"Chypre 🇨🇾", lat:34.970, lon:32.310, color:"#ff9f1c", sandTemp:null,
+          desc:"Plage de la côte ouest de Chypre où pondent tortues vertes et caouannes. Les nids menacés peuvent être déplacés vers une écloserie surveillée.",
+          stats:[{label:"espèces",value:"verte & caouanne"}],
+          tags:[{text:"Écloserie de protection"},{text:"Zone de ponte",cls:"hot"}] },
+        { id:"alagadi", type:"nesting", name:"Plage d'Alagadi", region:"Chypre 🇨🇾", lat:35.340, lon:33.470, color:"#ff9f1c", sandTemp:null,
+          desc:"Site de la côte nord de Chypre suivi depuis les années 1990 par des programmes de recherche et de bénévolat. Il a fourni de nombreuses données sur la ponte et le sex-ratio des tortues.",
+          stats:[{label:"suivi",value:"depuis les années 1990"}],
+          tags:[{text:"Recherche scientifique"},{text:"Zone de ponte",cls:"hot"}] },
+        { id:"tyr", type:"nesting", name:"Réserve naturelle de la côte de Tyr", region:"Liban 🇱🇧", lat:33.270, lon:35.200, color:"#ff9f1c", sandTemp:null,
+          desc:"Plages protégées du sud du Liban où viennent pondre des tortues caouannes et des tortues vertes. La réserve associe protection des nids et sensibilisation des habitants.",
+          stats:[{label:"espèces",value:"verte & caouanne"}],
+          tags:[{text:"Réserve naturelle"},{text:"Zone de ponte",cls:"hot"}] },
+        { id:"mikhmoret", type:"nesting", name:"Côte israélienne (Mikhmoret)", region:"Israël 🇮🇱", lat:32.400, lon:34.870, color:"#ff9f1c", sandTemp:null,
+          desc:"Plages du Levant où pondent des tortues vertes et des caouannes. Le centre de soins de Mikhmoret recueille et soigne des tortues blessées avant de les relâcher.",
+          stats:[{label:"espèces",value:"verte & caouanne"}],
+          tags:[{text:"Centre de soins"},{text:"Zone de ponte",cls:"hot"}] },
+        { id:"syrte", type:"nesting", name:"Golfe de Syrte", region:"Libye 🇱🇾", lat:31.200, lon:16.600, color:"#ff9f1c", sandTemp:null,
+          desc:"La côte libyenne compte parmi les sites de ponte importants de la tortue caouanne en Méditerranée centrale, mais reste encore peu suivie par les scientifiques.",
+          stats:[{label:"espèce principale",value:"caouanne"},{label:"suivi",value:"limité"}],
+          tags:[{text:"Données incomplètes"},{text:"Zone de ponte",cls:"hot"}] },
+        { id:"kuriat", type:"nesting", name:"Îles Kuriat", region:"Tunisie 🇹🇳", lat:35.800, lon:11.030, color:"#ff9f1c", sandTemp:null,
+          desc:"Petites îles de l'est tunisien où des caouannes viennent pondre. Elles font l'objet d'un suivi par des associations locales, entre protection des plages et tourisme de journée.",
+          stats:[{label:"espèce principale",value:"caouanne"}],
+          tags:[{text:"Suivi associatif"},{text:"Zone de ponte",cls:"hot"}] },
+        { id:"lampedusa", type:"nesting", name:"Lampedusa — Plage des Lapins", region:"Italie 🇮🇹", lat:35.520, lon:12.560, color:"#ff9f1c", sandTemp:null,
+          desc:"Plage d'une réserve naturelle au sud de la Sicile, l'un des sites de ponte réguliers de la caouanne en Italie. Des bénévoles protègent les nids chaque été.",
+          stats:[{label:"espèce principale",value:"caouanne"}],
+          tags:[{text:"Réserve naturelle"},{text:"Zone de ponte",cls:"hot"}] },
+        { id:"calabre", type:"nesting", name:"Côte ionienne de la Calabre", region:"Italie 🇮🇹", lat:38.250, lon:16.350, color:"#ff9f1c", sandTemp:null,
+          desc:"Les plages de la côte ionienne de la Calabre sont le principal secteur de ponte de l'Italie continentale pour la tortue caouanne.",
+          stats:[{label:"espèce principale",value:"caouanne"}],
+          tags:[{text:"Zone de ponte",cls:"hot"},{text:"Suivi régional"}] },
+
+        { id:"cabrera", type:"observation", name:"Parc national de Cabrera", region:"Baléares, Espagne 🇪🇸", lat:39.150, lon:2.950, color:"#4a8ac4", sandTemp:null,
+          desc:"Archipel protégé au sud de Majorque : herbiers de posidonie, eaux claires et activités encadrées. Un lieu d'observation où l'on peut croiser des caouannes sans les déranger.",
+          stats:[{label:"statut",value:"parc national"}],
+          tags:[{text:"Aire marine protégée"},{text:"Tourisme responsable"}] },
+
+        { id:"alboran", type:"feeding", name:"Mer d'Alboran", region:"Espagne / Maroc 🇪🇸 🇲🇦", lat:36.000, lon:-3.500, color:"#2ec4b6", sandTemp:null,
+          desc:"Entre l'Espagne et le Maroc, cette zone est une porte d'entrée pour les jeunes tortues venues de l'Atlantique. Elles y trouvent de la nourriture, mais aussi de nombreux filets.",
+          stats:[{label:"rôle",value:"nourrissage de jeunes"}],
+          tags:[{text:"Zone de nourrissage"},{text:"Captures accidentelles",cls:"danger"}] },
+        { id:"adriatique", type:"feeding", name:"Haute-Adriatique", region:"Italie / Croatie 🇮🇹 🇭🇷", lat:44.900, lon:13.100, color:"#2ec4b6", sandTemp:null,
+          desc:"Les eaux peu profondes du nord de l'Adriatique sont l'une des principales zones d'alimentation de la caouanne en Méditerranée. Elle s'y nourrit de crabes et de coquillages sur le fond.",
+          stats:[{label:"fonds",value:"peu profonds"}],
+          tags:[{text:"Zone de nourrissage"},{text:"Pêche au chalut",cls:"danger"}] },
+        { id:"gabes", type:"feeding", name:"Golfe de Gabès", region:"Tunisie 🇹🇳", lat:34.000, lon:10.600, color:"#2ec4b6", sandTemp:null,
+          desc:"Vastes fonds peu profonds au sud de la Tunisie, zone d'alimentation importante pour les caouannes. La forte activité de pêche, notamment au chalut, y est une menace.",
+          stats:[{label:"rôle",value:"nourrissage"}],
+          tags:[{text:"Zone de nourrissage"},{text:"Pêche au chalut",cls:"danger"}] },
+
+        { id:"gibraltar", type:"danger", name:"Détroit de Gibraltar", region:"Espagne / Maroc 🇪🇸 🇲🇦", lat:35.970, lon:-5.500, color:"#e74c3c", sandTemp:null,
+          desc:"Passage obligé entre l'Atlantique et la Méditerranée, avec l'un des trafics maritimes les plus denses : collisions, bruit sous-marin et filets menacent les tortues qui le traversent.",
+          stats:[{label:"risques",value:"trafic maritime dense"}],
+          tags:[{text:"Collisions",cls:"danger"},{text:"Bruit sous-marin",cls:"danger"}] },
+        { id:"canal-sicile", type:"danger", name:"Canal de Sicile", region:"Tunisie / Italie 🇹🇳 🇮🇹", lat:37.300, lon:11.800, color:"#e74c3c", sandTemp:null,
+          desc:"Zone de pêche très active (palangres et chaluts) où les captures accidentelles de tortues marines sont élevées. Des dispositifs de sauvetage et des engins plus sélectifs aident à réduire les pertes.",
+          stats:[{label:"risques",value:"captures accidentelles"}],
+          tags:[{text:"Palangres",cls:"danger"},{text:"Filets de pêche",cls:"danger"}] }
+      ];
+
+      // Toulon comme zone de départ par défaut
+      var defaultOrigin = MARKERS[0];
+      var playerData = { 
+        name: "", 
+        gender: "", 
+        colorTheme: "male", 
+        origin: { id: defaultOrigin.id, name: defaultOrigin.name, region: defaultOrigin.region, lat: defaultOrigin.lat, lon: defaultOrigin.lon, sandTemp: defaultOrigin.sandTemp }, 
+        sandTemp: defaultOrigin.sandTemp + "°C" 
+      };
+      var activeLayer = "all";
+
+      function turtleSVG(shellAccent, size) {
+        size = size || 170;
+        shellAccent = shellAccent || "#0a3c59";
+        var gid = "tg" + Math.random().toString(36).slice(2, 8);
+        var lightShell = shellAccent === "#ff9f1c" ? "#ffd0a0" : "#5fe0d2";
+        var midShell = shellAccent === "#ff9f1c" ? "#ff9f1c" : "#2ec4b6";
+        var darkShell = shellAccent === "#ff9f1c" ? "#c8541a" : "#1d8b80";
+        return '<svg viewBox="0 0 200 200" width="'+size+'" height="'+size+'" role="img" aria-label="Tortue marine vue de dessus">' +
+          '<defs><radialGradient id="'+gid+'s" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="'+lightShell+'"/><stop offset="55%" stop-color="'+midShell+'"/><stop offset="100%" stop-color="'+darkShell+'"/></radialGradient><radialGradient id="'+gid+'f" cx="50%" cy="40%" r="70%"><stop offset="0%" stop-color="'+(shellAccent==="#ff9f1c"?"#ffb070":"#3bb6a8")+'"/><stop offset="100%" stop-color="'+darkShell+'"/></radialGradient><clipPath id="'+gid+'c"><ellipse cx="100" cy="105" rx="52" ry="62"/></clipPath></defs>' +
+          '<ellipse cx="48" cy="70" rx="20" ry="36" fill="url(#'+gid+'f)" transform="rotate(-35 48 70)"/><ellipse cx="152" cy="70" rx="20" ry="36" fill="url(#'+gid+'f)" transform="rotate(35 152 70)"/><ellipse cx="62" cy="150" rx="14" ry="26" fill="url(#'+gid+'f)" transform="rotate(-18 62 150)"/><ellipse cx="138" cy="150" rx="14" ry="26" fill="url(#'+gid+'f)" transform="rotate(18 138 150)"/>' +
+          '<ellipse cx="100" cy="38" rx="18" ry="20" fill="url(#'+gid+'f)"/><circle cx="93" cy="34" r="3.2" fill="#0a3c59"/><circle cx="107" cy="34" r="3.2" fill="#0a3c59"/><circle cx="94" cy="33" r="1.1" fill="#fff"/><circle cx="108" cy="33" r="1.1" fill="#fff"/>' +
+          '<ellipse cx="100" cy="105" rx="52" ry="62" fill="url(#'+gid+'s)" stroke="'+darkShell+'" stroke-width="3"/>' +
+          '<g clip-path="url(#'+gid+'c)"><ellipse cx="100" cy="78" rx="22" ry="18" fill="none" stroke="'+shellAccent+'" stroke-width="2.5" opacity="0.55"/><ellipse cx="100" cy="108" rx="28" ry="20" fill="none" stroke="'+shellAccent+'" stroke-width="2.5" opacity="0.55"/><ellipse cx="100" cy="138" rx="22" ry="16" fill="none" stroke="'+shellAccent+'" stroke-width="2.5" opacity="0.55"/><path d="M100 52 V158" stroke="'+shellAccent+'" stroke-width="2" opacity="0.4"/><path d="M74 70 Q100 110 74 150" fill="none" stroke="'+shellAccent+'" stroke-width="2" opacity="0.4"/><path d="M126 70 Q100 110 126 150" fill="none" stroke="'+shellAccent+'" stroke-width="2" opacity="0.4"/><ellipse cx="86" cy="82" rx="14" ry="20" fill="#fff" opacity="0.18"/></g>' +
+          '<circle cx="100" cy="52" r="3" fill="#ffe0b0"/><circle cx="130" cy="58" r="2.5" fill="#ffe0b0"/><circle cx="70" cy="58" r="2.5" fill="#ffe0b0"/></svg>';
+      }
+
+      function turtleAccent() { return playerData.gender === "female" ? "#ff9f1c" : "#0a3c59"; }
+
+      (function() {
+        var c = document.getElementById("bubbles");
+        if (!c) return;
+        for (var i = 0; i < 14; i++) {
+          var b = document.createElement("span"); b.className = "bubble";
+          var s = 6 + Math.round(Math.random() * 22);
+          b.style.width = s + "px"; b.style.height = s + "px";
+          b.style.left = Math.random() * 100 + "%";
+          b.style.animationDuration = (6 + Math.random() * 6) + "s";
+          b.style.animationDelay = Math.random() * 7 + "s";
+          c.appendChild(b);
+        }
+      })();
+
+      document.getElementById("hero-turtle").innerHTML = turtleSVG("#2ec4b6", 140);
+      document.getElementById("preview-turtle").innerHTML = turtleSVG("#0a3c59", 160);
+      document.getElementById("launch-turtle").innerHTML = turtleSVG("#0a3c59", 180);
+
+      /* ============================================================
+         CARTE LEAFLET — réaliste, déplaçable, zoomable
+         (fonds de carte gratuits, sans clé API)
+         ============================================================ */
+      var leafletMap = null;
+      var pinLayer = null;
+
+      function initLeafletMap() {
+        if (leafletMap) return;
+        var el = document.getElementById("leaflet-map");
+        if (typeof L === "undefined") { showMapFallback(el); return; }
+
+        leafletMap = L.map(el, {
+          center: [37.5, 15], zoom: 4.5, minZoom: 3.5, maxZoom: 12,
+          zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90,
+          worldCopyJump: false, maxBounds: [[8, -45], [62, 75]], maxBoundsViscosity: 0.6
+        });
+
+        var plan = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(leafletMap);
+        var ocean = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}", {
+          maxZoom: 10, attribution: "Tiles &copy; Esri — GEBCO, NOAA, National Geographic"
+        });
+        var satellite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+          maxZoom: 18, attribution: "Tiles &copy; Esri"
+        });
+        L.control.layers({ "Plan": plan, "Océan": ocean, "Satellite": satellite }, null, { position: "topright", collapsed: true }).addTo(leafletMap);
+        L.control.scale({ imperial: false, position: "bottomleft" }).addTo(leafletMap);
+
+        pinLayer = L.layerGroup().addTo(leafletMap);
+        leafletMap.fitBounds([[31.0, -6.0], [45.5, 36.5]], { padding: [10, 10] });
+
+        var hint = document.getElementById("map-hint");
+        function hideHint() { if (hint) hint.classList.add("is-hidden"); }
+        leafletMap.once("movestart", hideHint);
+        leafletMap.once("zoomstart", hideHint);
+        setTimeout(hideHint, 9000);
+      }
+
+      // Si Leaflet n'a pas pu être chargé (pas de connexion) : liste de zones cliquables
+      function showMapFallback(el) {
+        var hint = document.getElementById("map-hint"); if (hint) hint.style.display = "none";
+        var box = document.createElement("div"); box.className = "map-fallback";
+        var p = document.createElement("p"); p.textContent = "La carte n'a pas pu se charger (connexion internet ?). Choisis une zone dans la liste :";
+        box.appendChild(p);
+        MARKERS.forEach(function(m) {
+          var b = document.createElement("button"); b.type = "button"; b.className = "suggest-btn"; b.textContent = m.name;
+          b.addEventListener("click", function() { showMarkerInfo(m.id); });
+          box.appendChild(b);
+        });
+        el.appendChild(box);
+      }
+
+      function renderPins() {
+        if (!leafletMap || !pinLayer) return;
+        pinLayer.clearLayers();
+        MARKERS.forEach(function(m) {
+          if (activeLayer !== "all" && m.type !== activeLayer && !(activeLayer === "nesting" && m.type === "nesting-cool")) return;
+          var selected = playerData.origin && playerData.origin.id === m.id;
+          var cls = "lf-pin map-pin--" + m.type;
+          if (m.subtype === "toulon") cls += " map-pin--toulon";
+          if (selected) cls += " map-pin--selected";
+          var icon = L.divIcon({ className: cls, html: '<div class="map-pin__dot"></div>', iconSize: [28, 28], iconAnchor: [14, 14] });
+          var marker = L.marker([m.lat, m.lon], { icon: icon, alt: m.name, riseOnHover: true, zIndexOffset: selected ? 1000 : 0 });
+          marker.bindTooltip(m.name, { direction: "top", offset: [0, -12], className: "pin-tip" });
+          marker.on("click", function() { showMarkerInfo(m.id); });
+          marker.addTo(pinLayer);
+        });
+      }
+
+      function updateFilterCounts() {
+        var counts = { all: MARKERS.length, nesting: 0, feeding: 0, observation: 0, danger: 0 };
+        MARKERS.forEach(function(m) {
+          if (m.type === "nesting" || m.type === "nesting-cool") counts.nesting++;
+          else if (m.type === "feeding") counts.feeding++;
+          else if (m.type === "observation") counts.observation++;
+          else if (m.type === "danger") counts.danger++;
+        });
+        if (document.getElementById("count-all")) document.getElementById("count-all").textContent = counts.all;
+        if (document.getElementById("count-nesting")) document.getElementById("count-nesting").textContent = counts.nesting;
+        if (document.getElementById("count-feeding")) document.getElementById("count-feeding").textContent = counts.feeding;
+        if (document.getElementById("count-observation")) document.getElementById("count-observation").textContent = counts.observation;
+        if (document.getElementById("count-danger")) document.getElementById("count-danger").textContent = counts.danger;
+      }
+
+      document.querySelectorAll(".filter-btn").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+          document.querySelectorAll(".filter-btn").forEach(function(b) { b.classList.remove("is-active"); });
+          btn.classList.add("is-active");
+          activeLayer = btn.getAttribute("data-layer");
+          renderPins();
+        });
+      });
+
+      function showMarkerInfo(markerId) {
+        var m = MARKERS.find(function(x) { return x.id === markerId; });
+        if (!m) return;
+        document.getElementById("mi-dot").style.background = m.color;
+        document.getElementById("mi-title").textContent = m.name;
+        document.getElementById("mi-coords").textContent = m.lat + "°N, " + m.lon + "°E — " + m.region;
+        document.getElementById("mi-desc").textContent = m.desc; 
+
+        var statsHtml = m.stats.map(function(s) {
+          var cls = (s.label.indexOf("temp") >= 0 && m.sandTemp !== null) ? (m.sandTemp >= 29.5 ? "stat-pill--temp hot" : "stat-pill--temp cool") : "";
+          return '<span class="stat-pill '+cls+'"><strong>' + s.value + '</strong> ' + s.label + '</span>';
+        }).join("");
+        document.getElementById("mi-stats").innerHTML = statsHtml;
+
+        var tagsHtml = m.tags.map(function(t) {
+          var cls = t.cls ? "marker-info__tag--" + t.cls : "";
+          return '<span class="marker-info__tag '+cls+'">' + (t.cls === "danger" ? "⚠️ " : "📍 ") + t.text + '</span>';
+        }).join("");
+        document.getElementById("mi-tags").innerHTML = tagsHtml;
+
+        var selectBtn = document.getElementById("mi-select");
+        selectBtn.disabled = false;
+        selectBtn.textContent = "📍 Zone en cours de consultation : " + m.name;
+        
+        // Mise à jour de la zone consultée sans bloquer la navigation
+        playerData.origin = { id: m.id, name: m.name, region: m.region, lat: m.lat, lon: m.lon, sandTemp: m.sandTemp };
+        playerData.sandTemp = m.sandTemp !== null ? m.sandTemp + "°C" : "N/A";
+        
+        renderPins();
+        document.getElementById("marker-info").classList.add("is-visible");
+
+        // Si la zone est hors de l'écran, on recentre doucement la carte dessus
+        if (leafletMap) {
+          var ll = L.latLng(m.lat, m.lon);
+          if (!leafletMap.getBounds().pad(-0.1).contains(ll)) leafletMap.panTo(ll);
+        }
+      }
+
+      /* ============================================================
+         PERSONNALISATION (prénom / sexe)
+         ============================================================ */
+      function applyTheme(gender) {
+        playerData.gender = gender;
+        playerData.colorTheme = gender;
+        document.body.setAttribute("data-theme", gender);
+        var accent = gender === "female" ? "#ff9f1c" : "#0a3c59";
+        document.getElementById("preview-turtle").innerHTML = turtleSVG(accent, 160);
+        document.getElementById("launch-turtle").innerHTML = turtleSVG(accent, 180);
+        updatePreviewBadge();
+      }
+
+      document.querySelectorAll(".gender-card").forEach(function(card) {
+        card.addEventListener("click", function() {
+          document.querySelectorAll(".gender-card").forEach(function(c) { c.classList.remove("is-selected"); c.setAttribute("aria-pressed", "false"); });
+          card.classList.add("is-selected"); card.setAttribute("aria-pressed", "true");
+          applyTheme(card.getAttribute("data-gender"));
+          updateStep2State();
+        });
+      });
+
+      function updatePreviewBadge() {
+        var badge = document.getElementById("preview-badge");
+        var parts = [];
+        if (playerData.name) parts.push(playerData.name);
+        if (playerData.gender) parts.push(playerData.gender === "female" ? "Femelle ♀" : "Mâle ♂");
+        badge.textContent = parts.length > 0 ? parts.join(" — ") + " — Tortue de Méditerranée" : "En attente de personnalisation...";
+      }
+
+      var nameInput = document.getElementById("turtle-name");
+      if (nameInput) {
+        nameInput.addEventListener("input", function(e) {
+          playerData.name = e.target.value;
+          document.getElementById("name-count").textContent = e.target.value.length + "/24 caractères";
+          document.getElementById("name-valid").classList.toggle("is-visible", e.target.value.trim().length > 0);
+          updatePreviewBadge();
+          updateStep2State();
+        });
+        // Entrée = passer à l'étape suivante (ou dire ce qu'il manque)
+        nameInput.addEventListener("keydown", function(e) {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          if (step2Valid()) goTo(2); else showStep2Hint();
+        });
+      }
+
+      document.querySelectorAll("[data-suggest]").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+          if (nameInput) {
+            nameInput.value = btn.getAttribute("data-suggest");
+            nameInput.dispatchEvent(new Event("input"));
+          }
+        });
+      });
+
+      function step2Valid() {
+        return playerData.name.trim().length > 0 && playerData.gender !== "";
+      }
+
+      function clearStep2Hint() {
+        var h = document.getElementById("step2-hint");
+        if (h) h.classList.remove("is-visible");
+      }
+
+      function shake(el) {
+        if (!el) return;
+        el.classList.remove("is-shaking"); void el.offsetWidth; el.classList.add("is-shaking");
+      }
+
+      function showStep2Hint() {
+        var noName = playerData.name.trim().length === 0;
+        var noGender = playerData.gender === "";
+        var msg = noName && noGender ? "Donne un prénom à ta tortue et choisis son sexe pour continuer."
+                : noName ? "Donne un prénom à ta tortue pour continuer."
+                : "Choisis le sexe de ta tortue pour continuer.";
+        var h = document.getElementById("step2-hint");
+        h.textContent = "⚠️ " + msg; h.classList.add("is-visible");
+        if (noName) { shake(nameInput); if (nameInput) nameInput.focus(); }
+        if (noGender) shake(document.querySelector(".gender-grid"));
+      }
+
+      // Le bouton reste cliquable : s'il manque quelque chose, on l'explique au lieu de ne rien faire
+      function updateStep2State() {
+        var ok = step2Valid();
+        var b = document.getElementById("btn-step2-next");
+        b.classList.toggle("is-locked", !ok);
+        b.setAttribute("aria-disabled", ok ? "false" : "true");
+        if (ok) clearStep2Hint();
+      }
+
+      /* ============================================================
+         NAVIGATION ENTRE LES ÉTAPES 1 → 2 → 3 → 4
+         ============================================================ */
+      var SCREENS = ["screen-story", "screen-customize", "screen-map", "screen-launch"];
+      var currentStep = 0;
+      var maxStep = 0;   // étape la plus avancée atteinte (pour rendre la barre de progression cliquable)
+
+      function updateStepper() {
+        document.querySelectorAll(".stepper__item").forEach(function(el) {
+          var s = parseInt(el.getAttribute("data-step"), 10);
+          el.classList.remove("stepper__item--active", "stepper__item--done", "stepper__item--todo");
+          el.classList.add(s === currentStep ? "stepper__item--active" : (s < currentStep ? "stepper__item--done" : "stepper__item--todo"));
+          var dot = el.querySelector(".stepper__dot");
+          if (dot) dot.textContent = s < currentStep ? "✓" : String(s + 1);
+          el.setAttribute("role", "button");
+          el.setAttribute("tabindex", s <= maxStep && s !== currentStep ? "0" : "-1");
+        });
+      }
+
+      document.querySelectorAll(".stepper__item").forEach(function(el) {
+        function go() {
+          var s = parseInt(el.getAttribute("data-step"), 10);
+          if (s <= maxStep && s !== currentStep) goTo(s);
+        }
+        el.addEventListener("click", go);
+        el.addEventListener("keydown", function(e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+      });
+
+      function enterMapStep() {
+        // Leaflet doit être créé quand le panneau est visible (sinon il mesure une carte de taille 0)
+        setTimeout(function() {
+          initLeafletMap();
+          if (leafletMap) leafletMap.invalidateSize();
+          updateFilterCounts();
+          showMarkerInfo(playerData.origin.id || "toulon"); // affiche Toulon par défaut
+          setTimeout(function() { if (leafletMap) leafletMap.invalidateSize(); }, 650); // après l'animation d'entrée
+        }, 80);
+      }
+
+      function goTo(stepIndex) {
+        if (stepIndex < 0 || stepIndex >= SCREENS.length) return;
+
+        // On ne peut pas aller au-delà de l'étape 2 sans prénom + sexe
+        if (stepIndex >= 2 && !step2Valid()) {
+          stepIndex = 1;
+          if (currentStep === 1) { showStep2Hint(); return; }
+          setTimeout(showStep2Hint, 120);
+        }
+
+        currentStep = stepIndex;
+        if (stepIndex > maxStep) maxStep = stepIndex;
+
+        // Un seul panneau visible à la fois, sans dépendre de minuteurs
+        SCREENS.forEach(function(id, idx) {
+          var el = document.getElementById(id);
+          el.classList.remove("panel--leaving");
+          if (idx === stepIndex) {
+            el.removeAttribute("hidden");
+            el.classList.remove("panel--active");
+            void el.offsetWidth;               // relance l'animation d'entrée
+            el.classList.add("panel--active");
+          } else {
+            el.classList.remove("panel--active");
+            el.setAttribute("hidden", "");
+          }
+        });
+
+        updateStepper();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
+        if (stepIndex === 1 && nameInput) setTimeout(function() { try { nameInput.focus({ preventScroll: true }); } catch (e) {} }, 400);
+        if (stepIndex === 2) enterMapStep();
+        if (stepIndex === 3) updateLaunchScreen();
+      }
+
+      document.querySelectorAll("[data-goto]").forEach(function(btn) {
+        btn.addEventListener("click", function() { goTo(parseInt(btn.getAttribute("data-goto"), 10)); });
+      });
+      document.getElementById("btn-step1-next").addEventListener("click", function() { goTo(1); });
+      document.getElementById("btn-step2-next").addEventListener("click", function() {
+        if (!step2Valid()) { showStep2Hint(); return; }
+        goTo(2);
+      });
+      document.getElementById("btn-step3-next").addEventListener("click", function() { goTo(3); });
+
+      // Trouve la scène Phaser de la carte (au cas où la clé s'écrit autrement)
+     // Trouve la scène Phaser de la carte même si la casse ou la clé varie
+function findMapSceneKey() {
+  if (!window.game || !window.game.scene) return null;
+  
+  // 1. Clés courantes
+  var candidates = ["Mapscene", "MapScene", "mapScene", "GameScene", "Game", "Map"];
+  for (var i = 0; i < candidates.length; i++) {
+    if (window.game.scene.getScene(candidates[i])) return candidates[i];
+  }
+
+  // 2. Si non trouvée, recherche dynamique dans toutes les scènes enregistrées
+  if (window.game.scene.scenes && window.game.scene.scenes.length > 0) {
+    return window.game.scene.scenes[0].sys.settings.key;
+  }
+
+  return null;
+}
+
+      document.getElementById("btn-launch").addEventListener("click", function() {
+  var key = findMapSceneKey();
+
+  // Si window.game n'est pas encore prêt, on tente de démarrer directement la première scène disponible
+  if (!key && window.game && window.game.scene) {
+    var allScenes = window.game.scene.dump();
+    if (allScenes && allScenes.length > 0) {
+      key = allScenes[0];
+    }
+  }
+
+  if (!key) { 
+    openModal("nogame"); 
+    return; 
+  }
+
+  // 1. Masquer l'interface HTML
+  document.querySelector(".app").style.display = "none";
+  document.querySelector(".ocean-bg").style.display = "none";
+
+  // 2. Afficher le conteneur Phaser
+  var gc = document.getElementById("game-container");
+  if (gc) gc.classList.add("is-live");
+
+  // 3. Redimensionner et démarrer la scène
+  try { 
+    if (window.game.scale && window.game.scale.refresh) {
+      window.game.scale.refresh(); 
+    }
+  } catch (e) {}
+
+  // Lancement de la scène avec transmission des données du joueur
+  window.game.scene.start(key, { playerData: playerData });
+});
+
+      function updateLaunchScreen() {
+        var name = playerData.name.trim() || "—";
+        var gender = playerData.gender === "female" ? "Femelle ♀" : playerData.gender === "male" ? "Mâle ♂" : "—";
+        var origin = playerData.origin.name || "—";
+        var temp = playerData.sandTemp || "—";
+        var tempVal = playerData.origin.sandTemp;
+        var tempBadge = document.getElementById("recap-temp-badge");
+        document.getElementById("recap-name").textContent = name;
+        document.getElementById("recap-gender").textContent = gender;
+        document.getElementById("recap-gender-icon").textContent = playerData.gender === "female" ? "♀" : "♂";
+        document.getElementById("recap-origin").textContent = origin;
+        document.getElementById("recap-temp").textContent = temp;
+        if (tempVal !== null && tempVal !== undefined) {
+          var isHot = tempVal >= 29.5;
+          tempBadge.textContent = isHot ? "Sable chaud → Femelles ♀" : "Sable frais → Mâles ♂";
+          tempBadge.className = "recap-row__temp " + (isHot ? "recap-row__temp--hot" : "recap-row__temp--cool");
+        } else {
+          tempBadge.textContent = "";
+        }
+        document.getElementById("launch-turtle").innerHTML = turtleSVG(turtleAccent(), 180);
+      }
+
+      function openModal(key) {
+        var icon, title, body, source;
+        if (key === "launch") {
+          var o = playerData.origin;
+          icon = "🌊"; title = "Prêt à jouer !";
+          body = "<p>Ta tortue <strong>" + (playerData.name || "sans nom") + "</strong> est prête à plonger.</p>" +
+            "<p>Genre : <strong>" + (playerData.gender === "female" ? "Femelle ♀" : "Mâle ♂") + "</strong><br>" +
+            "Lieu de départ : <strong>" + (o.name || "—") + "</strong><br>" +
+            "Température du nid : <strong>" + (playerData.sandTemp || "—") + "</strong></p>";
+          source = "Ocean Hackathon Toulon × Association Émergence";
+        } else if (key === "nogame") {
+          icon = "🛠️"; title = "Le jeu n'est pas encore prêt";
+          body = "<p>La scène Phaser de la carte (<strong>« Mapscene »</strong>) est introuvable, ou <strong>window.game</strong> n'existe pas.</p>" +
+            "<p>Vérifie que le projet tourne avec <strong>npm run dev</strong> (pas en double-cliquant sur le fichier), que <strong>src/main.js</strong> s'exécute sans erreur (console du navigateur, F12), qu'il définit <strong>window.game = new Phaser.Game(...)</strong> et qu'il enregistre une scène avec la clé <strong>Mapscene</strong>.</p>";
+          source = "Ton avatar et tes choix sont conservés : tu peux réessayer.";
+        } else {
+          icon = "⚙️"; title = "Paramètres";
+          body = "<p>Jeu éducatif — Ocean Hackathon Toulon × Association Émergence.</p>";
+          source = "Version démo";
+        }
+        document.getElementById("modal-icon").textContent = icon;
+        document.getElementById("modal-title").textContent = title;
+        document.getElementById("modal-body").innerHTML = body;
+        document.getElementById("modal-source").textContent = source;
+        document.getElementById("modal-overlay").classList.add("is-open");
+      }
+      function closeModal() { document.getElementById("modal-overlay").classList.remove("is-open"); }
+      document.getElementById("modal-close").addEventListener("click", closeModal);
+      document.getElementById("modal-overlay").addEventListener("click", function(e) { if (e.target === this) closeModal(); });
+      document.getElementById("btn-settings").addEventListener("click", function() { openModal("settings"); });
+
+      updateFilterCounts();
+      renderPins();
+      updateStepper();
+      updateStep2State();
+    </script>
+  </body>
+</html>
